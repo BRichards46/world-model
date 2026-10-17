@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "world-model"
+version = "0.1.0"
+description = "Market and macro state models backed by local research data."
+requires-python = ">=3.10"
+dependencies = [
+  "numpy>=1.23",
+  "pandas>=2.0",
+  "pyarrow>=12",
+  "PyYAML>=6",
+]
+
+[project.scripts]
+world-market-state = "world_model.cli.market_state:main"
+world-market-walk-forward = "world_model.cli.market_walk_forward:main"
+world-market-breadth = "world_model.cli.market_breadth:main"
+world-market-forecast = "world_model.cli.market_forecast:main"
+world-market-targets = "world_model.cli.market_targets:main"
+world-economic-state = "world_model.cli.economic_state:main"
+world-economic-triggers = "world_model.cli.economic_triggers:main"
+world-economic-asset-drivers = "world_model.cli.economic_asset_drivers:main"
+world-combined-state = "world_model.cli.combined_state:main"
+world-simple-market = "world_model.cli.simple_market:main"
+world-simple-economic = "world_model.cli.simple_economic:main"
+world-growth-trend = "world_model.cli.growth_trend:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

@@ -1,0 +1,68 @@
+horizons:
+  one_month: 21
+  three_months: 63
+  six_months: 126
+  twelve_months: 252
+
+axes:
+  activity:
+    column: activity_score
+    weight: 0.45
+    composite_sign: 1.0
+  inflation_pressure:
+    column: inflation_pressure_score
+    weight: 0.25
+    composite_sign: -1.0
+  liquidity_credit:
+    column: liquidity_credit_score
+    weight: 0.30
+    composite_sign: 1.0
+
+regime_thresholds:
+  strong_activity: 0.20
+  weak_activity: -0.20
+  high_inflation: 0.20
+  low_inflation: 0.10
+  disinflation: -0.10
+  easy_liquidity: 0.25
+  tight_liquidity: -0.25
+
+validation:
+  evaluation_frequency: ME
+  min_train_observations: 84
+  min_bucket_observations: 12
+  bucket_count: 5
+  simple_deterioration_threshold: -0.25
+  detailed_deterioration_threshold: -0.25
+  market_deterioration_threshold: -0.25
+  drawdown_threshold: -0.10
+
+  models:
+    - id: unconditional
+      label: Unconditional
+      kind: unconditional
+
+    - id: detailed_economic_bucket
+      label: Detailed economic composite
+      kind: single_bucket
+      feature: detailed_economic_composite_score
+
+    - id: simple_economic_bucket
+      label: Simple economic composite
+      kind: single_bucket
+      feature: simple_economic_composite_score
+
+    - id: activity_bucket
+      label: Activity axis
+      kind: single_bucket
+      feature: activity_score
+
+    - id: inflation_bucket
+      label: Inflation pressure axis
+      kind: single_bucket
+      feature: inflation_pressure_score
+
+    - id: liquidity_bucket
+      label: Liquidity / credit axis
+      kind: single_bucket
+      feature: liquidity_credit_score

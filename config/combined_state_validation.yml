@@ -1,0 +1,49 @@
+evaluation_frequency: ME
+min_train_observations: 84
+min_bucket_observations: 12
+bucket_count: 5
+joint_bucket_count: 3
+
+targets:
+  market_deterioration_threshold: -0.25
+  economic_deterioration_threshold: -0.25
+  drawdown_threshold: -0.10
+
+models:
+  - id: unconditional
+    label: Unconditional
+    kind: unconditional
+
+  - id: market_bucket
+    label: Market composite bucket
+    kind: single_bucket
+    feature: market_composite_score
+
+  - id: economic_bucket
+    label: Economic composite bucket
+    kind: single_bucket
+    feature: economic_composite_score
+
+  - id: market_x_economic
+    label: Market x economic composite
+    kind: joint_bucket
+    left_feature: market_composite_score
+    right_feature: economic_composite_score
+
+  - id: market_x_activity
+    label: Market x economic activity
+    kind: joint_bucket
+    left_feature: market_composite_score
+    right_feature: activity_score
+
+  - id: market_x_inflation
+    label: Market x inflation pressure
+    kind: joint_bucket
+    left_feature: market_composite_score
+    right_feature: inflation_pressure_score
+
+  - id: market_x_liquidity
+    label: Market x liquidity/credit
+    kind: joint_bucket
+    left_feature: market_composite_score
+    right_feature: liquidity_credit_score

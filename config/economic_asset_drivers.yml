@@ -1,0 +1,144 @@
+evaluation_frequency: ME
+min_train_observations: 60
+min_bucket_observations: 15
+return_method: normalized_price_change
+normalization_window: 252
+normalization_min_periods: 63
+
+horizons:
+  one_month: 21
+  three_months: 63
+  six_months: 126
+  twelve_months: 252
+
+features:
+  include_aggregate_counts: true
+  include_group_counts: true
+  include_trigger_failed: true
+  include_trigger_margins: true
+
+asset_groups:
+  equity:
+    label: Equity index futures
+    driver_groups:
+      - sales_production
+      - employment
+      - inflation
+      - cfnai
+    assets:
+      ES: ES__B.parquet
+      NQ: NQ__B.parquet
+      YM: YM__B.parquet
+      NK: NK__B.parquet
+
+  rates_duration:
+    label: Treasury duration futures
+    driver_groups:
+      - inflation
+      - employment
+      - cfnai
+    assets:
+      ZT: ZT__B.parquet
+      ZF: ZF__B.parquet
+      ZN: ZN__B.parquet
+      ZB: ZB__B.parquet
+
+  usd_fx:
+    label: U.S. dollar futures
+    driver_groups:
+      - inflation
+      - sales_production
+      - employment
+      - cfnai
+    assets:
+      DX: DX2_B.parquet
+
+  non_usd_fx:
+    label: Non-USD currency futures
+    driver_groups:
+      - inflation
+      - sales_production
+      - employment
+      - cfnai
+    assets:
+      AD: AD__B.parquet
+      BP: BP__B.parquet
+      CD: CD__B.parquet
+      CNH: CNH_B.parquet
+      JY: JY__B.parquet
+      SF: SF__B.parquet
+
+  precious_metals:
+    label: Precious metals futures
+    driver_groups:
+      - inflation
+      - cfnai
+      - sales_production
+    assets:
+      GC: GC2_B.parquet
+      SI: SI2_B.parquet
+      PL: PL__B.parquet
+
+  energy:
+    label: Energy futures
+    driver_groups:
+      - sales_production
+      - cfnai
+      - inflation
+    assets:
+      CL: CL2_B.parquet
+      NG: NG2_B.parquet
+      HO: HO2_B.parquet
+
+  industrial_metals:
+    label: Industrial metals futures
+    driver_groups:
+      - sales_production
+      - cfnai
+    assets:
+      HG: HG2_B.parquet
+
+  grains_oilseeds:
+    label: Grain and oilseed futures
+    driver_groups:
+      - sales_production
+      - inflation
+    assets:
+      C: C2__B.parquet
+      S: S2__B.parquet
+      W: W2__B.parquet
+      BO: BO2_B.parquet
+      SM: SM2_B.parquet
+      O: O2__B.parquet
+      RR: RR2_B.parquet
+
+  softs:
+    label: Soft commodity futures
+    driver_groups:
+      - sales_production
+      - inflation
+    assets:
+      KC: KC2_B.parquet
+      SB: SB2_B.parquet
+      OJ: OJ2_B.parquet
+      CC: CC2_B.parquet
+
+  livestock_dairy:
+    label: Livestock and dairy futures
+    driver_groups:
+      - sales_production
+      - inflation
+    assets:
+      FC: FC__B.parquet
+      LC: LC__B.parquet
+      LH: LH__B.parquet
+      DA: DA__B.parquet
+
+  housing:
+    label: Lumber futures
+    driver_groups:
+      - housing_income
+      - employment
+      - cfnai
+    assets:
+      LBR: LBR_B.parquet

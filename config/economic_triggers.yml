@@ -1,0 +1,140 @@
+evaluation_frequency: ME
+min_train_observations: 60
+min_bucket_observations: 15
+econ_health_trigger: 10
+include_group_features: true
+include_margin_features: true
+
+horizons:
+  one_month: 21
+  three_months: 63
+  six_months: 126
+  twelve_months: 252
+
+targets:
+  economic_deterioration_threshold: -0.25
+  economic_weak_state_threshold: -0.25
+  market_deterioration_threshold: -0.25
+  include_market_state: true
+
+triggers:
+  - id: retail_sales_yoy
+    label: Retail sales YoY
+    group: sales_production
+    series_id: RSAFS
+    transform: yoy_pct
+    healthy_operator: ">"
+    threshold: 0.03
+
+  - id: industrial_production_yoy
+    label: Industrial production YoY
+    group: sales_production
+    series_id: INDPRO
+    transform: yoy_pct
+    healthy_operator: ">"
+    threshold: 0.01
+
+  - id: sales_orders_inventories
+    label: CFNAI sales/orders/inventories
+    group: sales_production
+    series_id: SOANDI
+    transform: level
+    healthy_operator: ">"
+    threshold: -0.02
+
+  - id: production_income
+    label: CFNAI production/income
+    group: sales_production
+    series_id: PANDI
+    transform: level
+    healthy_operator: ">"
+    threshold: -0.05
+
+  - id: housing_labor_force_ratio_yoy
+    label: Housing starts / labor force YoY
+    group: housing_income
+    transform: ratio_yoy_pct
+    numerator_series_id: HOUST
+    denominator_series_id: CLF16OV
+    healthy_operator: ">"
+    threshold: -0.10
+
+  - id: real_personal_income_yoy
+    label: Real personal income YoY
+    group: housing_income
+    series_id: RPI
+    transform: yoy_pct
+    healthy_operator: ">"
+    threshold: 0.02
+
+  - id: consumption_housing
+    label: CFNAI consumption/housing
+    group: housing_income
+    series_id: CANDH
+    transform: level
+    healthy_operator: ">"
+    threshold: -0.20
+
+  - id: unemployment_vs_trend
+    label: Unemployment vs 12-month trend
+    group: employment
+    series_id: UNRATE
+    transform: unemployment_vs_trend
+    healthy_operator: ">"
+    threshold: -0.10
+
+  - id: payrolls_yoy
+    label: Nonfarm payrolls YoY
+    group: employment
+    series_id: PAYEMS
+    transform: yoy_pct
+    healthy_operator: ">"
+    threshold: 0.01
+
+  - id: employment_unemployment_hours
+    label: CFNAI employment/unemployment/hours
+    group: employment
+    series_id: EUANDH
+    transform: level
+    healthy_operator: ">"
+    threshold: -0.10
+
+  - id: cfnai
+    label: CFNAI
+    group: cfnai
+    series_id: CFNAI
+    transform: level
+    healthy_operator: ">"
+    threshold: -0.20
+
+  - id: cfnai_3m_ma
+    label: CFNAI 3-month MA
+    group: cfnai
+    series_id: CFNAIMA3
+    transform: level
+    healthy_operator: ">"
+    threshold: -0.10
+
+  - id: cfnai_diffusion
+    label: CFNAI diffusion
+    group: cfnai
+    series_id: CFNAIDIFF
+    transform: level
+    healthy_operator: ">"
+    threshold: -0.15
+
+  - id: headline_cpi_yoy
+    label: Headline CPI YoY
+    group: inflation
+    series_id: CPIAUCSL
+    transform: yoy_pct
+    healthy_operator: "<"
+    threshold: 0.025
+
+  - id: core_cpi_yoy
+    label: Core CPI YoY
+    group: inflation
+    series_id: CPILFESL
+    transform: yoy_pct
+    healthy_operator: "<"
+    threshold: 0.025

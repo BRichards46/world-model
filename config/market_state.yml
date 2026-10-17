@@ -1,0 +1,112 @@
+target_asset: ES
+
+horizons:
+  one_month: 21
+  three_months: 63
+  six_months: 126
+  twelve_months: 252
+
+analog:
+  top_n: 40
+  min_component_coverage: 0.70
+  max_forward_horizon: 252
+  min_trading_days_between_analogs: 60
+
+breadth:
+  enabled: true
+  file: outputs/norgate_market_breadth.parquet
+
+instruments:
+  ES:
+    file: ES__B.parquet
+    name: S&P 500 futures
+    role: equity
+  NQ:
+    file: NQ__B.parquet
+    name: Nasdaq 100 futures
+    role: equity
+  YM:
+    file: YM__B.parquet
+    name: Dow futures
+    role: equity
+  NK:
+    file: NK__B.parquet
+    name: Nikkei futures
+    role: equity
+  VX:
+    file: VX__B.parquet
+    name: VIX futures
+    role: volatility
+  ZT:
+    file: ZT__B.parquet
+    name: 2-year Treasury futures
+    role: rates
+  ZN:
+    file: ZN__B.parquet
+    name: 10-year Treasury futures
+    role: rates
+  ZB:
+    file: ZB__B.parquet
+    name: Treasury bond futures
+    role: rates
+  DX:
+    file: DX2_B.parquet
+    name: US Dollar Index futures
+    role: dollar
+  CL:
+    file: CL2_B.parquet
+    name: Crude oil futures
+    role: commodity
+  HG:
+    file: HG2_B.parquet
+    name: Copper futures
+    role: commodity
+  GC:
+    file: GC2_B.parquet
+    name: Gold futures
+    role: defensive
+
+cot:
+  ES:
+    file: ES%0000$.parquet
+    source_column: lg_spec_pct_oi
+    interpretation: crowded_long_negative
+  NQ:
+    file: NQ%0000$.parquet
+    source_column: lg_spec_pct_oi
+    interpretation: crowded_long_negative
+  CL:
+    file: CL#0000$.parquet
+    source_column: lg_spec_pct_oi
+    interpretation: crowded_long_negative
+  GC:
+    file: GC#0000$.parquet
+    source_column: lg_spec_pct_oi
+    interpretation: crowded_long_negative
+
+components:
+  trend:
+    weight: 0.20
+    assets: [ES, NQ, YM, NK]
+  momentum:
+    weight: 0.15
+    assets: [ES, NQ, YM, NK]
+  breadth:
+    weight: 0.20
+  volatility:
+    weight: 0.15
+    equity_asset: ES
+    volatility_asset: VX
+  rates:
+    weight: 0.10
+    assets: [ZT, ZN, ZB]
+  dollar:
+    weight: 0.10
+    assets: [DX]
+    invert: true
+  commodities:
+    weight: 0.05
+    assets: [CL, HG]
+  positioning:
+    weight: 0.05
+    assets: [ES, NQ, CL, GC]

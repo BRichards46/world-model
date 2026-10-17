@@ -1,0 +1,159 @@
+history_frequency: B
+
+scoring:
+  window: 120
+  min_periods: 36
+  scale: 2.0
+
+components:
+  growth:
+    weight: 0.25
+    composite_sign: 1.0
+    indicators:
+      - id: real_gdp_yoy
+        label: Real GDP YoY
+        series_id: GDPC1
+        transform: yoy_pct
+        params:
+          max_prior_gap_days: 120
+      - id: industrial_production_yoy
+        label: Industrial production YoY
+        series_id: INDPRO
+        transform: yoy_pct
+      - id: real_income_yoy
+        label: Real personal income YoY
+        series_id: RPI
+        transform: yoy_pct
+      - id: real_retail_sales_yoy
+        label: Real retail sales YoY
+        series_id: RRSFS
+        transform: yoy_pct
+      - id: cfnai_level
+        label: Chicago Fed National Activity Index
+        series_id: CFNAI
+        transform: level
+      - id: weekly_economic_index
+        label: Weekly Economic Index
+        series_id: WEI
+        transform: level
+
+  labor:
+    weight: 0.15
+    composite_sign: 1.0
+    indicators:
+      - id: payrolls_yoy
+        label: Nonfarm payrolls YoY
+        series_id: PAYEMS
+        transform: yoy_pct
+      - id: unemployment_rate
+        label: Unemployment rate
+        series_id: UNRATE
+        transform: level
+        invert: true
+      - id: initial_claims
+        label: Initial jobless claims
+        series_id: ICSA
+        transform: level
+        invert: true
+      - id: temp_help_yoy
+        label: Temporary help employment YoY
+        series_id: TEMPHELPS
+        transform: yoy_pct
+
+  inflation:
+    weight: 0.20
+    composite_sign: -1.0
+    indicators:
+      - id: headline_cpi_yoy
+        label: Headline CPI YoY
+        series_id: CPIAUCSL
+        transform: yoy_pct
+      - id: core_cpi_yoy
+        label: Core CPI YoY
+        series_id: CPILFESL
+        transform: yoy_pct
+      - id: core_pce_yoy
+        label: Core PCE YoY
+        series_id: PCEPILFE
+        transform: yoy_pct
+      - id: median_cpi
+        label: Median CPI
+        series_id: MEDCPIM158SFRBCLE
+        transform: level
+      - id: trimmed_mean_cpi
+        label: Trimmed mean CPI
+        series_id: TRMMEANCPIM158SFRBCLE
+        transform: level
+      - id: sticky_core_cpi
+        label: Sticky core CPI
+        series_id: CORESTICKM159SFRBATL
+        transform: level
+      - id: five_year_expected_inflation
+        label: 5-year expected inflation
+        series_id: EXPINF5YR
+        transform: level
+
+  liquidity:
+    weight: 0.15
+    composite_sign: 1.0
+    indicators:
+      - id: real_m2_yoy
+        label: Real M2 YoY
+        series_id: M2REAL
+        transform: yoy_pct
+      - id: nominal_m2_yoy
+        label: Nominal M2 YoY
+        series_id: WM2NS
+        transform: yoy_pct
+        params:
+          max_prior_gap_days: 14
+      - id: real_disposable_income_yoy
+        label: Real disposable personal income YoY
+        series_id: DSPIC96
+        transform: yoy_pct
+      - id: real_income_ex_transfers_yoy
+        label: Real personal income ex transfers YoY
+        series_id: W875RX1
+        transform: yoy_pct
+
+  credit:
+    weight: 0.10
+    composite_sign: 0.5
+    indicators:
+      - id: household_debt_yoy
+        label: Household debt YoY
+        series_id: CMDEBT
+        transform: yoy_pct
+        params:
+          max_prior_gap_days: 120
+      - id: business_credit_yoy
+        label: Business credit YoY
+        series_id: BCNSDODNS
+        transform: yoy_pct
+        params:
+          max_prior_gap_days: 120
+      - id: federal_debt_yoy
+        label: Federal debt YoY
+        series_id: FGSDODNS
+        transform: yoy_pct
+        params:
+          max_prior_gap_days: 120
+      - id: consumer_credit_yoy
+        label: Consumer credit YoY
+        series_id: FBCELLQ027S
+        transform: yoy_pct
+        params:
+          max_prior_gap_days: 120
+
+  housing:
+    weight: 0.15
+    composite_sign: 1.0
+    indicators:
+      - id: housing_starts_yoy
+        label: Housing starts YoY
+        series_id: HOUST
+        transform: yoy_pct
+      - id: building_permits_yoy
+        label: Building permits YoY
+        series_id: PERMIT
+        transform: yoy_pct

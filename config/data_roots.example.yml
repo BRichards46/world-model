@@ -1,0 +1,6 @@
+# Copy this file to data_roots.yml and adjust the paths for your machine.
+csi_processed: ~/data/csi_data/processed
+csi_cot_processed: ~/data/csi_data/COT_processed
+norgate_prices: ~/data/equity/norgate/prices/adjustment=totalreturn
+norgate_metadata: ~/data/equity/norgate/metadata
+fred: ~/data/fred

@@ -1,0 +1,94 @@
+target_asset: ES
+defensive_return: cash
+one_way_transaction_cost: 0.0005
+annualization_days: 252
+whipsaw_days: 63
+
+trend_rules:
+  monthly_10ma:
+    label: Monthly 10-month moving average
+    frequency: ME
+    window: 10
+    min_periods: 10
+    include_current_in_average: false
+  daily_200dma:
+    label: Daily 200-day moving average
+    frequency: B
+    window: 200
+    min_periods: 200
+    include_current_in_average: true
+
+growth_filters:
+  retail_indprod:
+    label: Real retail sales and industrial production growth
+    healthy_when: all
+    rules:
+      - column: real_retail_sales_yoy_value
+        label: Real retail sales YoY
+        operator: ">"
+        threshold: 0.0
+      - column: industrial_production_yoy_value
+        label: Industrial production YoY
+        operator: ">"
+        threshold: 0.0
+  unemployment_trend:
+    label: Unemployment rate trend
+    healthy_when: all
+    rules:
+      - column: unemployment_rate_value
+        label: Unemployment rate below 12-month trend
+        operator: "<="
+        moving_average_window: 252
+        min_periods: 126
+  activity_axis:
+    label: Economic activity axis
+    healthy_when: all
+    rules:
+      - column: activity_score
+        label: Activity score positive
+        operator: ">="
+        threshold: 0.0
+
+strategies:
+  - id: buy_hold
+    label: Buy and hold
+    kind: buy_hold
+
+  - id: trend_monthly_10ma
+    label: Trend only - monthly 10MA
+    kind: trend
+    trend_rule: monthly_10ma
+
+  - id: trend_daily_200dma
+    label: Trend only - daily 200DMA
+    kind: trend
+    trend_rule: daily_200dma
+
+  - id: econ_retail_indprod
+    label: Economic only - retail/IP
+    kind: economic
+    growth_filter: retail_indprod
+
+  - id: gtt_retail_indprod_monthly
+    label: GTT - retail/IP + monthly trend
+    kind: growth_trend
+    growth_filter: retail_indprod
+    trend_rule: monthly_10ma
+
+  - id: gtt_retail_indprod_daily
+    label: GTT - retail/IP + daily trend
+    kind: growth_trend
+    growth_filter: retail_indprod
+    trend_rule: daily_200dma
+
+  - id: gtt_unemployment_monthly
+    label: GTT - unemployment trend + monthly trend
+    kind: growth_trend
+    growth_filter: unemployment_trend
+    trend_rule: monthly_10ma
+
+  - id: gtt_activity_monthly
+    label: GTT - activity axis + monthly trend
+    kind: growth_trend
+    growth_filter: activity_axis
+    trend_rule: monthly_10ma

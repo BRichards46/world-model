@@ -1,0 +1,103 @@
+target_asset: ES
+
+horizons:
+  one_month: 21
+  three_months: 63
+  six_months: 126
+  twelve_months: 252
+
+instruments:
+  ES:
+    file: ES__B.parquet
+    name: S&P 500 futures
+  NQ:
+    file: NQ__B.parquet
+    name: Nasdaq 100 futures
+  YM:
+    file: YM__B.parquet
+    name: Dow futures
+  NK:
+    file: NK__B.parquet
+    name: Nikkei futures
+  ZT:
+    file: ZT__B.parquet
+    name: 2-year Treasury futures
+  ZN:
+    file: ZN__B.parquet
+    name: 10-year Treasury futures
+  ZB:
+    file: ZB__B.parquet
+    name: Treasury bond futures
+  DX:
+    file: DX2_B.parquet
+    name: US Dollar Index futures
+  CL:
+    file: CL2_B.parquet
+    name: Crude oil futures
+  HG:
+    file: HG2_B.parquet
+    name: Copper futures
+  GC:
+    file: GC2_B.parquet
+    name: Gold futures
+
+blocks:
+  equity:
+    weight: 0.35
+    assets: [ES, NQ, YM, NK]
+    invert: false
+  rates:
+    weight: 0.25
+    assets: [ZT, ZN, ZB]
+    invert: false
+  commodities:
+    weight: 0.20
+    assets: [CL, HG, GC]
+    invert: false
+  fx:
+    weight: 0.20
+    assets: [DX]
+    invert: true
+
+validation:
+  evaluation_frequency: ME
+  min_train_observations: 84
+  min_bucket_observations: 12
+  bucket_count: 5
+  simple_deterioration_threshold: -0.25
+  drawdown_threshold: -0.10
+
+  models:
+    - id: unconditional
+      label: Unconditional
+      kind: unconditional
+
+    - id: detailed_market_bucket
+      label: Detailed market composite
+      kind: single_bucket
+      feature: detailed_market_composite_score
+
+    - id: simple_composite_bucket
+      label: Simple composite
+      kind: single_bucket
+      feature: simple_composite_score
+
+    - id: equity_bucket
+      label: Equity block
+      kind: single_bucket
+      feature: equity_score
+
+    - id: rates_bucket
+      label: Rates block
+      kind: single_bucket
+      feature: rates_score
+
+    - id: commodities_bucket
+      label: Commodities block
+      kind: single_bucket
+      feature: commodities_score
+
+    - id: fx_bucket
+      label: FX / dollar block
+      kind: single_bucket
+      feature: fx_score
