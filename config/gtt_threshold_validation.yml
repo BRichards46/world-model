@@ -1,0 +1,90 @@
+# GTT macro filters: legacy trigger thresholds vs zero lines, OR combinations, and trigger counts.
+# Values are percent (YoY growth), percentage points (unemployment gap) or hours (manufacturing hours gap).
+# Danger = value <danger_operator> level. The GTT risk-test settings come from gtt_risk_validation.yml.
+
+# Compare rows only within a window, and only rows whose `start` matches: a filter whose inputs begin
+# later (CPI 1972, durable orders 1999, core CPI and retail sales 2001) is scored on a shorter sample.
+windows:
+  long_history:
+    start: "1962-01-01"
+    label: "1962 onward (CPI filters from 1972, durable orders from 1999, core CPI and retail sales from 2001)"
+  cpi_era:
+    start: "1972-09-01"
+    label: "September 1972 onward (every long-history and CPI filter on the same sample)"
+  common:
+    start: "2001-07-01"
+    label: "July 2001 onward (every input available; only about three stress eras, so few tests can pass)"
+
+bootstrap_iterations: 500
+backtest_cost_bps: 5
+
+series:
+  indpro_yoy:
+    danger_operator: "<="
+    zero_line: 0.0
+    your_threshold: 1.0
+    sweep: [-2.0, -1.0, -0.5, 0.5, 1.5, 2.0, 3.0]
+  payems_yoy:
+    danger_operator: "<="
+    zero_line: 0.0
+    your_threshold: 1.0
+    sweep: [-1.0, -0.5, 0.5, 1.5, 2.0]
+  unemployment_gap:            # unemployment rate minus its trailing 12-month average
+    danger_operator: ">"
+    zero_line: 0.0
+    your_threshold: 0.1
+    sweep: [-0.1, 0.2, 0.3, 0.5]
+  housing_lf_yoy:              # housing starts per labor-force participant, YoY
+    danger_operator: "<="
+    zero_line: 0.0
+    your_threshold: -10.0
+    sweep: [-30.0, -20.0, -15.0, -5.0]
+  cpi_yoy:
+    danger_operator: ">="
+    your_threshold: 2.5
+    sweep: [2.0, 3.0, 3.5, 4.0, 5.0]
+  core_cpi_yoy:
+    danger_operator: ">="
+    your_threshold: 2.5
+    sweep: [2.0, 3.0, 3.5, 4.0]
+  retail_yoy:                  # nominal retail sales (RSAFS)
+    danger_operator: "<="
+    zero_line: 0.0
+    your_threshold: 3.0
+    sweep: [1.0, 2.0, 4.0, 5.0]
+  real_retail_yoy:
+    danger_operator: "<="
+    zero_line: 0.0
+    sweep: [-2.0, -1.0, 1.0, 2.0]
+  awhman_gap:                  # manufacturing hours minus trailing 12-month average
+    danger_operator: "<"
+    zero_line: 0.0
+    sweep: [-0.4, -0.3, -0.2, -0.1, 0.1]
+  real_dgorder_yoy:
+    danger_operator: "<="
+    zero_line: 0.0
+    sweep: [-10.0, -5.0, 5.0]
+
+or_combinations:
+  indpro_or_unemployment: [indpro_yoy@zero_line, unemployment_gap@zero_line]
+  indpro_or_unemployment_buffer: [indpro_yoy@zero_line, unemployment_gap@your_threshold]
+  indpro1_or_unemployment_buffer: [indpro_yoy@your_threshold, unemployment_gap@your_threshold]
+  indpro_or_awhman: [indpro_yoy@zero_line, awhman_gap@zero_line]
+  indpro_or_dgorder: [indpro_yoy@zero_line, real_dgorder_yoy@zero_line]
+  indpro_or_real_retail: [indpro_yoy@zero_line, real_retail_yoy@zero_line]
+  indpro_or_unemployment_or_awhman: [indpro_yoy@zero_line, unemployment_gap@zero_line, awhman_gap@zero_line]
+  indpro_or_awhman_or_dgorder_or_retail: [indpro_yoy@zero_line, awhman_gap@zero_line, real_dgorder_yoy@zero_line, real_retail_yoy@zero_line]
+
+counts:
+  long_history_zero_lines:
+    members: [indpro_yoy@zero_line, unemployment_gap@zero_line, awhman_gap@zero_line, payems_yoy@zero_line, housing_lf_yoy@zero_line]
+    at_least: [1, 2, 3]
+  growth_set_zero_lines:
+    members: [indpro_yoy@zero_line, unemployment_gap@zero_line, awhman_gap@zero_line, real_dgorder_yoy@zero_line, real_retail_yoy@zero_line]
+    at_least: [1, 2, 3]
+  your_triggers_long:
+    members: [indpro_yoy@your_threshold, payems_yoy@your_threshold, unemployment_gap@your_threshold, housing_lf_yoy@your_threshold, cpi_yoy@your_threshold]
+    at_least: [1, 2, 3]
+  your_triggers_all:
+    members: [indpro_yoy@your_threshold, payems_yoy@your_threshold, unemployment_gap@your_threshold, housing_lf_yoy@your_threshold, cpi_yoy@your_threshold, core_cpi_yoy@your_threshold, retail_yoy@your_threshold]
+    at_least: [2, 3, 4]

@@ -34,6 +34,23 @@ def test_overlay_identifies_high_conviction_defensive_state() -> None:
     assert inputs["real_durable_orders"]["status"] == "warning"
 
 
+def test_unemployment_warns_only_beyond_the_buffer() -> None:
+    market_dates = pd.date_range("2025-01-31", periods=16, freq="ME")
+    history = chain_price_total_return(pd.Series([100.0 + index for index in range(16)], index=market_dates))
+    dates = pd.date_range("2025-01-01", periods=16, freq="MS")
+
+    def unemployment_status(latest: float, config: dict) -> str:
+        series = _macro_series(dates)
+        series["UNRATE"] = pd.Series([4.0] * 15 + [latest], index=dates)
+        result = compute_equity_risk_overlay(series, history, "2026-04-30", {"moving_average_months": 10, **config})
+        return {item["id"]: item for item in result["inputs"]}["unemployment_trend"]["status"]
+
+    # Trailing 12-month average includes the latest month, so a jump of x sits about 11x/12 above it.
+    assert unemployment_status(4.1, {}) == "healthy"  # about +0.09 pp: inside the default 0.1 buffer
+    assert unemployment_status(4.2, {}) == "warning"  # about +0.18 pp
+    assert unemployment_status(4.1, {"unemployment_buffer_pp": 0.0}) == "warning"  # zero line
+
+
 def test_overlay_flags_stale_market_history() -> None:
     market_dates = pd.date_range("2025-01-31", periods=16, freq="ME")
     price = pd.Series([100.0 + index for index in range(16)], index=market_dates)

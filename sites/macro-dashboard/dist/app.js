@@ -498,9 +498,10 @@ function renderDecision() {
   const market = numberOrNull(inputs.market_trend?.value);
   const unemployment = numberOrNull(inputs.unemployment_trend?.value);
   const production = numberOrNull(inputs.industrial_production?.value);
+  const buffer = numberOrNull(overlay.rule?.unemployment_buffer_pp) ?? 0;
   const distance = [
     market == null ? null : `S&P ${signed(market, 1)}% ${market >= 0 ? "above" : "below"} its 10-month average`,
-    unemployment == null ? null : `unemployment ${signed(unemployment, 2)} pp vs its 12-month average (warns above 0)`,
+    unemployment == null ? null : `unemployment ${signed(unemployment, 2)} pp vs its 12-month average (warns above ${signed(buffer, 1)})`,
     production == null ? null : `industrial production ${signed(production, 1)}% YoY (warns at or below 0)`,
   ].filter(Boolean).join(" · ");
 
@@ -532,7 +533,7 @@ function renderDecision() {
     <div class="decision-grid">
       <article class="decision-card ${action.tone}"><span>Equity risk · ${escapeHtml(overlay.state_label)}</span>
         <p>${escapeHtml(distance)}.</p>
-        <small>Risk-off needs the S&amp;P below its 10-month average <em>and</em> unemployment above its 12-month average or industrial production contracting. Validated on future S&amp;P volatility and drawdowns across 17 separate stress periods.</small></article>
+        <small>Risk-off needs the S&amp;P below its 10-month average <em>and</em> unemployment more than ${escapeHtml(buffer.toFixed(1))} pp above its 12-month average or industrial production contracting. Validated on future S&amp;P volatility and drawdowns across 17 separate stress periods.</small></article>
       <article class="decision-card"><span>Trend · 6–12 months</span>
         <div class="trend-chips">${trends}</div>
         <small>Trend following earned +3–4%/yr since 1990 (strongest at 12 months, weaker since 2010). Short-term range timing and quad filters added nothing.</small></article>

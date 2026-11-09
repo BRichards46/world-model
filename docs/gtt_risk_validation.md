@@ -113,3 +113,14 @@ normalized index, making the 1988 source handoff auditable.
 - https://www.philosophicaleconomics.com/2016/02/uetrend/
 - https://www.philosophicaleconomics.com/2016/01/gtt/
 - https://www.philosophicaleconomics.com/2016/01/movingaverage/
+
+## Alternative thresholds and combinations
+
+`docs/gtt_threshold_validation.md` tests the legacy trigger levels against the
+zero lines, plus OR combinations and trigger counts. Summary: unemployment
+more than 0.1 pp above its 12-month average is the strongest single filter.
+Industrial production works at any level from 0% to 3%. CPI fails at every
+level. Hours and durable orders do not improve industrial production as OR
+terms. The dashboard overlay now uses industrial production ≤ 0 OR
+unemployment more than 0.1 pp above its 12-month average. This study keeps
+testing the zero lines.

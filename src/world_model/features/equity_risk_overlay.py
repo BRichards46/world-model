@@ -46,7 +46,11 @@ def compute_equity_risk_overlay(
     unemployment_value = _last(unemployment)
     unemployment_average_value = trailing_average(unemployment, 12)
     unemployment_gap = _difference(unemployment_value, unemployment_average_value)
-    unemployment_warning = _greater_than(unemployment_value, unemployment_average_value)
+    # Warn only when unemployment is more than the buffer above its 12-month average. A 0.1 pp buffer
+    # passed every GTT robustness test and switched less often than the zero line
+    # (docs/gtt_threshold_validation.md).
+    unemployment_buffer = float(config.get("unemployment_buffer_pp", 0.1))
+    unemployment_warning = _greater_than(unemployment_gap, unemployment_buffer)
 
     industrial_growth = pct_change_months(_series(series_by_id, "INDPRO", as_of_date), 12)
     industrial_warning = _nonpositive(industrial_growth)
@@ -86,9 +90,13 @@ def compute_equity_risk_overlay(
         "state_label": state_labels[state_id],
         "message": messages[state_id],
         "method_note": "Threshold signals, not historical percentiles. Signals use the latest point-in-time macro vintages.",
+        "rule": {
+            "unemployment_buffer_pp": unemployment_buffer,
+            "moving_average_months": window,
+        },
         "inputs": [
             _input("market_trend", "S&P 500 trend", market_gap, "% vs 10m avg", price_warning, "below average", history.index[-1]),
-            _input("unemployment_trend", "Unemployment trend", unemployment_gap, "pp vs 12m avg", unemployment_warning, "above average", _date(unemployment)),
+            _input("unemployment_trend", "Unemployment trend", unemployment_gap, "pp vs 12m avg", unemployment_warning, f"> {unemployment_buffer:+.1f} pp above average", _date(unemployment)),
             _input("industrial_production", "Industrial production", industrial_growth, "% YoY", industrial_warning, "contracting", _date(_series(series_by_id, "INDPRO", as_of_date))),
             _input("manufacturing_hours", "Manufacturing hours", hours_gap, "hours vs 12m avg", hours_warning, "below average", _date(hours), role="early warning"),
             _input("real_durable_orders", "Real durable orders", orders_growth, "% YoY", orders_warning, "contracting", _date(real_orders), role="confirmation"),

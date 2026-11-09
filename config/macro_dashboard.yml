@@ -99,6 +99,9 @@ equity_risk_overlay:
   total_return_symbol: $SPXTR
   moving_average_months: 10
   max_market_lag_days: 5
+  # Unemployment warns only when it is more than this many points above its 12-month average.
+  # 0.1 was the strongest GTT setting with industrial production (docs/gtt_threshold_validation.md).
+  unemployment_buffer_pp: 0.1
 
 # Read-only summaries of the standalone point-in-time market-relevance screen.
 # These findings appear in drill-downs and do not affect dashboard scores.
