@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="description" content="Point-in-time macroeconomic level, velocity, momentum, and freshness monitor." />
+    <title>World Model · Macro Monitor</title>
+    <link rel="stylesheet" href="./styles.css?v=20261109-1" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand-block">
+          <div class="eyebrow">WORLD MODEL / MACRO</div>
+          <h1>Economic monitor</h1>
+        </div>
+        <div class="topbar-actions">
+          <div class="asof"><span>POINT-IN-TIME</span><strong id="asof-date">Loading…</strong></div>
+          <button class="icon-button" id="theme-toggle" type="button" aria-label="Toggle color theme">◐</button>
+        </div>
+      </header>
+
+      <section id="decision-panel" class="decision-panel" aria-label="What to do now" hidden></section>
+
+      <section id="risk-overlay" class="risk-overlay" aria-label="Equity risk overlay"></section>
+      <section id="quad-strip" class="quad-strip" aria-label="Growth and inflation quad" hidden></section>
+
+      <main class="workspace">
+        <aside class="control-rail">
+          <div class="rail-label">VIEW</div>
+          <nav id="component-filters" aria-label="Filter indicators by category"></nav>
+          <div class="rail-rule"></div>
+          <label class="search-label" for="series-search">FIND SERIES</label>
+          <input id="series-search" class="search-input" type="search" placeholder="Search…" autocomplete="off" />
+          <label class="check-row">
+            <input id="attention-only" type="checkbox" />
+            <span>Attention only</span>
+          </label>
+          <div class="rail-note">
+            <strong>How to read it</strong>
+            <p>Percentiles describe each series versus its own history. Bars identify category; pale status shading marks favorable or unfavorable direction.</p>
+          </div>
+        </aside>
+
+        <section class="monitor-panel" aria-labelledby="monitor-title">
+          <div class="monitor-head">
+            <div>
+              <div class="eyebrow" id="view-eyebrow">CORE SERIES</div>
+              <h2 id="monitor-title">Level × velocity monitor</h2>
+              <p id="view-description">Raw transformed values, point-in-time percentiles, momentum streaks, and source freshness.</p>
+            </div>
+            <div class="monitor-tools">
+              <div class="view-switch" role="group" aria-label="Dashboard view">
+                <button class="active" type="button" data-view="monitor">Monitor</button>
+                <button type="button" data-view="quads">Quads</button>
+                <button type="button" data-view="momentum">Trend</button>
+                <button type="button" data-view="premium">Options</button>
+              </div>
+              <div class="legend" aria-label="Percentile legend">
+                <span><i class="legend-line low"></i>Low</span>
+                <span><i class="legend-line mid"></i>Median</span>
+                <span><i class="legend-line high"></i>High</span>
+              </div>
+            </div>
+          </div>
+
+          <div id="monitor-view">
+            <div class="table-header" aria-hidden="true">
+              <span>Indicator / current reading</span><span>Level</span><span>Velocity</span><span>Recent path</span><span>Momentum</span><span>Freshness</span>
+            </div>
+            <div id="series-groups" class="series-groups" aria-live="polite"></div>
+            <div id="empty-state" class="empty-state" hidden>No indicators match this view.</div>
+          </div>
+          <div id="quads-view" hidden></div>
+          <div id="momentum-view" hidden></div>
+          <div id="premium-view" hidden></div>
+        </section>
+      </main>
+      <footer class="status-line" id="status-line" aria-label="Data status"></footer>
+    </div>
+
+    <aside id="detail-drawer" class="detail-drawer" aria-hidden="true" aria-labelledby="detail-title">
+      <div class="drawer-backdrop" data-close-drawer></div>
+      <section class="drawer-panel" role="dialog" aria-modal="true">
+        <button class="drawer-close" type="button" data-close-drawer aria-label="Close details">×</button>
+        <div id="detail-content"></div>
+      </section>
+    </aside>
+
+    <script src="./app.js?v=20261109-1" defer></script>
+  </body>
+</html>
