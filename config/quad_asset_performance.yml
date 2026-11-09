@@ -1,0 +1,83 @@
+# Forward asset performance conditional on growth/inflation quads.
+# Signals come from the point-in-time quad walk-forward (config/growth_inflation_quad.yml).
+availability_lag_trading_days: 1
+false_discovery_rate: 0.10
+# Below the FDR bar but q <= this, stable early/late, and same sign on medians and ex-crisis.
+suggestive_q_value: 0.25
+# Spreads are also recomputed without these signal dates (crisis rebounds) as a robustness check.
+robustness_exclusions:
+  - ["2008-06-30", "2009-12-31"]
+  - ["2020-01-31", "2020-12-31"]
+minimum_months_per_quad: 24
+minimum_rotation_gap_months: 12
+
+horizons:
+  one_month: 21
+  three_months: 63
+
+signals:
+  realized_last:
+    label: Last realized quad
+    note: Most recent quarter with both GDP and full-quarter CPI reported at the signal date.
+  projected_current:
+    label: Projected current quarter
+    note: Base-case quad for the quarter containing the signal date.
+  projected_next:
+    label: Projected next quarter
+    note: Base-case quad for the following quarter.
+  hindsight_current:
+    label: Hindsight current quarter (not tradeable)
+    note: The quarter's eventual realized quad from revised data; an upper bound on what quads explain.
+
+# Clean total-return indices from Norgate (log returns, %).
+norgate_assets:
+  sp500: {symbol: $SPXTR, label: S&P 500, group: equity}
+  small_caps: {symbol: $RUTTR, label: Russell 2000, group: equity}
+  tech: {symbol: $SPXTTR, label: Info tech, group: sector}
+  discretionary: {symbol: $SPXDTR, label: Consumer discretionary, group: sector}
+  communication: {symbol: $SPXLTR, label: Communication services, group: sector}
+  financials: {symbol: $SPXFTR, label: Financials, group: sector}
+  industrials: {symbol: $SPXITR, label: Industrials, group: sector}
+  materials: {symbol: $SPXMTR, label: Materials, group: sector}
+  energy_equities: {symbol: $SPXETR, label: Energy, group: sector}
+  health_care: {symbol: $SPXATR, label: Health care, group: sector}
+  staples: {symbol: $SPXSTR, label: Consumer staples, group: sector}
+  utilities: {symbol: $SPXUTR, label: Utilities, group: sector}
+  long_treasuries: {symbol: TLT, label: "Long Treasuries (TLT, 2002+)", group: rates, dataset: equities}
+  gold: {symbol: GLD, label: "Gold (GLD, 2004+)", group: commodities, dataset: equities}
+
+# Sectors and small caps are also scored as excess return over this benchmark.
+excess_benchmark: sp500
+excess_groups: [sector]
+excess_assets: [small_caps]
+
+# CSI continuous futures groups (normalized price change; directional scores, not cash returns).
+csi_asset_groups:
+  - rates_duration
+  - usd_fx
+  - precious_metals
+  - energy
+  - industrial_metals
+
+# Playbook test: a risk-balanced long/short portfolio of each quad's leaders (+1)
+# and laggards (-1). "Follow" holds it; "fade" (recovery) holds the opposite.
+playbook:
+  assets: [small_caps, tech, discretionary, communication, financials, industrials, materials,
+           energy_equities, health_care, staples, utilities, long_treasuries, gold]
+  volatility_window_days: 252
+  learned_minimum_quarters: 6
+  learned_leaders: 3
+  # Commonly published quad playbook, fixed in advance (not fitted to this data).
+  textbook:
+    1:
+      long: [tech, discretionary, communication, small_caps]
+      short: [utilities, staples, energy_equities, gold]
+    2:
+      long: [energy_equities, materials, industrials, financials, small_caps]
+      short: [utilities, staples, health_care, long_treasuries]
+    3:
+      long: [gold, energy_equities, utilities, health_care]
+      short: [financials, discretionary, small_caps, industrials]
+    4:
+      long: [long_treasuries, utilities, staples, health_care, gold]
+      short: [energy_equities, materials, industrials, financials, small_caps]

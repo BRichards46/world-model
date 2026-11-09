@@ -1,0 +1,51 @@
+forward_days: 21
+analog_count: 100
+
+horizons:
+  - {id: one_month, label: 1m, days: 21, weight: 0.10}
+  - {id: three_months, label: 3m, days: 63, weight: 0.20}
+  - {id: six_months, label: 6m, days: 126, weight: 0.25}
+  - {id: ten_months, label: 10m, days: 210, weight: 0.25}
+  - {id: twelve_months, label: 12m, days: 252, weight: 0.20}
+
+expiry_selection:
+  target_dte: 30
+  minimum_dte: 20
+  maximum_dte: 45
+
+classification:
+  direction_return_pct: 0.50
+  direction_positive_rate_pct: 55
+  rich_iv_edge_vol_pts: 2.0
+  cheap_iv_edge_vol_pts: -1.0
+  minimum_touch_improvement_pct: 3.0
+  strangle_touch_ceiling_pct: 35.0
+
+assets:
+  - {id: ES, label: S&P 500, group: futures, group_label: Futures proxies, group_order: 1, order: 1, underlying_symbol: SPY, options_symbol: SPY}
+  - {id: NQ, label: Nasdaq 100, group: futures, group_label: Futures proxies, group_order: 1, order: 2, underlying_symbol: QQQ, options_symbol: QQQ}
+  - {id: RTY, label: Russell 2000, group: futures, group_label: Futures proxies, group_order: 1, order: 3, underlying_symbol: IWM, options_symbol: IWM}
+  - {id: GC, label: Gold, group: futures, group_label: Futures proxies, group_order: 1, order: 4, underlying_symbol: GLD, options_symbol: GLD}
+  - {id: SI, label: Silver, group: futures, group_label: Futures proxies, group_order: 1, order: 5, underlying_symbol: SLV, options_symbol: SLV}
+  - {id: XLC, label: Communication Services, group: sectors, group_label: Sector ETFs, group_order: 2, order: 1, underlying_symbol: XLC, options_symbol: XLC}
+  - {id: XLY, label: Consumer Discretionary, group: sectors, group_label: Sector ETFs, group_order: 2, order: 2, underlying_symbol: XLY, options_symbol: XLY}
+  - {id: XLP, label: Consumer Staples, group: sectors, group_label: Sector ETFs, group_order: 2, order: 3, underlying_symbol: XLP, options_symbol: XLP}
+  - {id: XLE, label: Energy, group: sectors, group_label: Sector ETFs, group_order: 2, order: 4, underlying_symbol: XLE, options_symbol: XLE}
+  - {id: XLF, label: Financials, group: sectors, group_label: Sector ETFs, group_order: 2, order: 5, underlying_symbol: XLF, options_symbol: XLF}
+  - {id: XLV, label: Health Care, group: sectors, group_label: Sector ETFs, group_order: 2, order: 6, underlying_symbol: XLV, options_symbol: XLV}
+  - {id: XLI, label: Industrials, group: sectors, group_label: Sector ETFs, group_order: 2, order: 7, underlying_symbol: XLI, options_symbol: XLI}
+  - {id: XLB, label: Materials, group: sectors, group_label: Sector ETFs, group_order: 2, order: 8, underlying_symbol: XLB, options_symbol: XLB}
+  - {id: XLRE, label: Real Estate, group: sectors, group_label: Sector ETFs, group_order: 2, order: 9, underlying_symbol: XLRE, options_symbol: XLRE}
+  - {id: XLK, label: Technology, group: sectors, group_label: Sector ETFs, group_order: 2, order: 10, underlying_symbol: XLK, options_symbol: XLK}
+  - {id: XLU, label: Utilities, group: sectors, group_label: Sector ETFs, group_order: 2, order: 11, underlying_symbol: XLU, options_symbol: XLU}
+
+uncovered_futures:
+  - {id: ZB, reason: No matching Tanuki options surface}
+  - {id: ZN, reason: No matching Tanuki options surface}
+  - {id: DX, reason: No matching Tanuki options surface}
+  - {id: CL, reason: No matching Tanuki options surface}
+  - {id: BO, reason: No matching Tanuki options surface}
+  - {id: FC, reason: No matching Tanuki options surface}
+  - {id: SB, reason: No matching Tanuki options surface}
+  - {id: KC, reason: No matching Tanuki options surface}
+  - {id: KW, reason: No matching Tanuki options surface}

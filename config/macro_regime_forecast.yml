@@ -1,0 +1,33 @@
+evaluation_frequency: ME
+minimum_train_observations: 120
+minimum_class_observations: 10
+minimum_oos_observations: 60
+ridge_penalty: 1.0
+
+horizons:
+  one_month: 21
+  three_months: 63
+  six_months: 126
+
+targets:
+  high_volatility_state:
+    label: High-volatility macro state
+    regimes:
+      - high_inflation_plateau
+  low_volatility_state:
+    label: Low-volatility macro state
+    regimes:
+      - balanced_transition
+      - goldilocks_recovery
+
+features:
+  - growth_level_score
+  - growth_momentum_score
+  - inflation_level_score
+  - inflation_momentum_score
+  - financial_conditions_level_score
+  - financial_conditions_momentum_score
+
+feature_change_windows:
+  - 21
+  - 63

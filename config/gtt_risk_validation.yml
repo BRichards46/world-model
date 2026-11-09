@@ -1,0 +1,34 @@
+evaluation_frequency: ME
+minimum_observations_per_state: 24
+minimum_split_lift_fraction: 0.10
+bootstrap_iterations: 1000
+bootstrap_confidence: 0.90
+bootstrap_minimum_block_months: 12
+
+horizons:
+  one_month: 21
+  three_months: 63
+  six_months: 126
+  twelve_months: 252
+
+price_trends:
+  ten_month: 10
+  two_hundred_day: 200
+
+equity_benchmark:
+  enabled: true
+  id: sp500
+  label: S&P 500 (Norgate $SPX price return through Jan 4 1988; $SPXTR total return thereafter)
+  # Norgate index symbols: $SPX price history chained to $SPXTR total return.
+  price_symbol: $SPX
+  total_return_symbol: $SPXTR
+
+# The original GTT growth filter treats any non-positive constituent as enough
+# to turn price-trend protection on. The double-confirmation state is defensive
+# only when macro danger and a negative price trend occur together.
+macro_signals:
+  - unemployment_trend
+  - industrial_production_growth
+  - dual_growth
+  - any_macro_danger
+

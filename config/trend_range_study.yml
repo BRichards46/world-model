@@ -1,0 +1,36 @@
+# Hedgeye-style TREND / TRADE study and quad-filter test.
+# Assets (Norgate indices, CSI futures groups) and the textbook quad playbook come from
+# config/quad_asset_performance.yml; quad signals from outputs/quad_asset_performance/quad_signals.parquet.
+start: "1990-01-01"
+availability_lag_trading_days: 1
+false_discovery_rate: 0.10
+minimum_rotation_gap_months: 12
+
+# TREND (Hedgeye: 3 months or more): average of vol-adjusted momentum over these lookbacks.
+trend:
+  lookbacks: [63, 126, 252]
+  volatility_days: 63
+  # Single-lookback checks; the composite is the pre-specified primary signal.
+  sensitivity:
+    three_month: [63]
+    twelve_month: [252]
+
+# TRADE band (Hedgeye: 3 weeks or less): distance from the 15-day average in horizon-vol units.
+# Favorable = trend side × position <= -threshold (dip in an uptrend, rally in a downtrend).
+range:
+  window_days: 15
+  thresholds: [0.0, 0.5]
+
+# Weekly signals, held for these sessions.
+range_horizons:
+  one_week: 5
+  three_weeks: 15
+
+# Month-end quad signals, held for these sessions.
+quad_horizons:
+  one_month: 21
+  three_months: 63
+
+# Assets that the textbook playbook scores (the S&P 500 is the benchmark and is not scored).
+quad_filter_assets: [small_caps, tech, discretionary, communication, financials, industrials, materials,
+                     energy_equities, health_care, staples, utilities, long_treasuries, gold]

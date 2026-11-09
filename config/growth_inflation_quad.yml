@@ -1,0 +1,29 @@
+# Growth/inflation quad with base-effect look-ahead.
+# Growth = real GDP YoY; inflation = quarterly average of headline CPI YoY.
+# All inputs come from the point-in-time FRED vintage store.
+series:
+  growth: GDPC1
+  growth_nowcast: GDPNOW
+  inflation: CPIAUCSL
+  inflation_trend: CPILFESL
+
+settings:
+  forward_quarters: 3          # quarters beyond the current one
+  growth_trend_quarters: 4     # trailing quarters for the trend growth assumption
+  growth_offset_saar: 1.0      # low/high growth scenarios, pp annualized
+  inflation_trend_months: 6    # trailing months of core CPI for the base inflation run-rate
+  inflation_offset_mom: 0.1    # low/high inflation scenarios, pp per month
+  history_quarters: 12
+  use_nowcast: true
+
+backtest:
+  start: "1998-01-31"
+
+# Forecast models for unreported periods (see world_model.features.quad_forecast_models).
+# growth: trend | bridge | bridge_nowcast | leading ; inflation: core | energy
+models:
+  growth: leading
+  inflation: energy
+  probabilities:
+    minimum_history: 24
+    knowledge_lag_days: 120

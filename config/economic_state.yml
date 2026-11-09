@@ -1,8 +1,9 @@
 history_frequency: B
 
 scoring:
-  window: 120
-  min_periods: 36
+  window_years: 10
+  min_history_years: 5
+  min_periods: 20
   scale: 2.0
 
 components:

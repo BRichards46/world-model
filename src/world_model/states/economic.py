@@ -85,10 +85,17 @@ class EconomicStateEngine:
 
         for indicator_id, result in indicator_results.items():
             settings = indicator_lookup[indicator_id]
+            window_years = settings.get("score_window_years", score_defaults.get("window_years"))
+            observation_window = settings.get("score_window", score_defaults.get("window"))
             score = score_indicator(
                 result.value,
-                window=int(settings.get("score_window", score_defaults.get("window", 120))),
+                window=int(observation_window) if observation_window is not None else None,
+                window_years=int(window_years) if window_years is not None else None,
                 min_periods=int(settings.get("score_min_periods", score_defaults.get("min_periods", 36))),
+                min_history_years=int(
+                    settings.get("score_min_history_years", score_defaults.get("min_history_years", 0))
+                )
+                or None,
                 scale=float(settings.get("score_scale", score_defaults.get("scale", 2.0))),
                 invert=bool(settings.get("invert", False)),
             )

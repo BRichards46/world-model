@@ -11,6 +11,110 @@ import pandas as pd
 DEFAULT_COMMON_STOCK_EXCHANGES = ("NYSE", "Nasdaq", "NYSE American")
 
 
+def read_catalog_price_series(
+    price_root: str | Path,
+    metadata_root: str | Path,
+    symbol: str,
+    adjustment: str = "TOTALRETURN",
+    column: str = "close",
+) -> pd.Series:
+    """Read the authoritative Norgate price file selected by the price catalog."""
+    prices = Path(price_root).expanduser()
+    metadata = Path(metadata_root).expanduser()
+    catalog_path = metadata / "price_file_catalog.parquet"
+    if not catalog_path.exists():
+        raise FileNotFoundError(catalog_path)
+    catalog = pd.read_parquet(catalog_path)
+    rows = catalog[
+        catalog["symbol"].astype(str).eq(symbol)
+        & catalog["dataset"].astype(str).eq("equities")
+        & catalog["price_adjustment"].astype(str).str.upper().eq(adjustment.upper())
+    ]
+    if rows.empty:
+        raise ValueError(f"No canonical Norgate {adjustment} file found for {symbol}.")
+    row = rows.sort_values(["last_date", "row_count"]).iloc[-1]
+    path = metadata.parent / str(row["relative_path"])
+    if path.parent.resolve() != prices.resolve():
+        raise ValueError(f"Norgate catalog path for {symbol} is outside the configured price root: {path}")
+    data = pd.read_parquet(path, columns=["date", column])
+    data["date"] = pd.to_datetime(data["date"], errors="coerce")
+    data[column] = pd.to_numeric(data[column], errors="coerce")
+    data = data.dropna().sort_values("date").drop_duplicates("date", keep="last")
+    series = data.set_index("date")[column].astype(float)
+    series.index = series.index.normalize()
+    return series.rename(symbol)
+
+
+def read_catalog_price_frame(
+    price_root: str | Path,
+    metadata_root: str | Path,
+    symbol: str,
+    adjustment: str = "TOTALRETURN",
+    columns: Iterable[str] = ("open", "high", "low", "close"),
+) -> pd.DataFrame:
+    """Read canonical Norgate OHLC data for path-dependent forward outcomes."""
+    prices = Path(price_root).expanduser()
+    metadata = Path(metadata_root).expanduser()
+    catalog_path = metadata / "price_file_catalog.parquet"
+    if not catalog_path.exists():
+        raise FileNotFoundError(catalog_path)
+    catalog = pd.read_parquet(catalog_path)
+    rows = catalog[
+        catalog["symbol"].astype(str).eq(symbol)
+        & catalog["dataset"].astype(str).eq("equities")
+        & catalog["price_adjustment"].astype(str).str.upper().eq(adjustment.upper())
+    ]
+    if rows.empty:
+        raise ValueError(f"No canonical Norgate {adjustment} file found for {symbol}.")
+    row = rows.sort_values(["last_date", "row_count"]).iloc[-1]
+    path = metadata.parent / str(row["relative_path"])
+    if path.parent.resolve() != prices.resolve():
+        raise ValueError(f"Norgate catalog path for {symbol} is outside the configured price root: {path}")
+    requested = ["date", *columns]
+    data = pd.read_parquet(path, columns=requested)
+    data["date"] = pd.to_datetime(data["date"], errors="coerce")
+    for column in columns:
+        data[column] = pd.to_numeric(data[column], errors="coerce")
+    data = data.dropna(subset=["date", "close"]).sort_values("date").drop_duplicates("date", keep="last")
+    data = data.set_index("date")
+    data.index = data.index.normalize()
+    return data.astype(float)
+
+
+def read_norgate_index_series(
+    metadata_root: str | Path,
+    symbol: str,
+    adjustment: str = "TOTALRETURN",
+    column: str = "close",
+    dataset: str = "us_indices",
+) -> pd.Series:
+    """Read a Norgate index series (for example ``$SPX`` or ``$SPXTR``) via the price catalog."""
+    metadata = Path(metadata_root).expanduser()
+    catalog_path = metadata / "price_file_catalog.parquet"
+    if not catalog_path.exists():
+        raise FileNotFoundError(catalog_path)
+    catalog = pd.read_parquet(catalog_path)
+    rows = catalog[
+        catalog["symbol"].astype(str).eq(symbol)
+        & catalog["dataset"].astype(str).eq(dataset)
+        & catalog["price_adjustment"].astype(str).str.upper().eq(adjustment.upper())
+    ]
+    if rows.empty:
+        raise ValueError(f"No Norgate {dataset} {adjustment} file found for {symbol}.")
+    row = rows.sort_values(["last_date", "row_count"]).iloc[-1]
+    norgate_root = metadata.parent.resolve()
+    path = (metadata.parent / str(row["relative_path"])).resolve()
+    if norgate_root not in path.parents:
+        raise ValueError(f"Norgate catalog path for {symbol} is outside the Norgate root: {path}")
+    data = pd.read_parquet(path, columns=["date", column])
+    data["date"] = pd.to_datetime(data["date"], errors="coerce")
+    data[column] = pd.to_numeric(data[column], errors="coerce")
+    data = data.dropna().sort_values("date").drop_duplicates("date", keep="last")
+    series = data.set_index("date")[column].astype(float)
+    series.index = series.index.normalize()
+    return series.rename(symbol)
+
+
 @dataclass(frozen=True)
 class BreadthBuildStats:
     selected_assets: int
