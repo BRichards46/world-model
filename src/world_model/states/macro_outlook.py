@@ -90,7 +90,13 @@ def build_macro_outlook(
             text += f" The S&P is {abs(market):.1f}% {'above' if market >= 0 else 'below'} its 10-month average"
             if market_trigger is not None and market >= 0:
                 text += f"; a month-end close about {abs(market_trigger):.1f}% below today's level would break that trend"
+                odds = (triggers.get("market_trend") or {}).get("odds")
+                if odds:
+                    text += f" ({_odds(odds['probability'])} by month-end at today's volatility)"
             text += "."
+        risk_off = _risk_off_text(triggers)
+        if risk_off:
+            text += " " + risk_off
         now.append({"label": "Equity risk", "text": text})
     growth = _growth_text(quarters[current_index] if current_index is not None else None, inputs)
     if growth:
@@ -261,11 +267,19 @@ def _meaning(
         trigger = triggers.get("unemployment_trend")
         if trigger:
             threshold = float(trigger["threshold_rate"])
-            published = math.floor(threshold * 10.0 + 1e-9) / 10.0 + 0.1
-            lines.append(
+            published = trigger.get("published_threshold") or math.floor(threshold * 10.0 + 1e-9) / 10.0 + 0.1
+            line = (
                 f"The overlay's unemployment warning needs the rate above {threshold:.2f}%, so a print of "
-                f"{published:.1f}% or higher (last {float(trigger['latest_rate']):.1f}%)."
+                f"{float(published):.1f}% or higher (last {float(trigger['latest_rate']):.1f}%)."
             )
+            odds = trigger.get("odds")
+            if odds:
+                line += (
+                    f" Since 1990, when unemployment started {odds.get('starting_state', 'where it is now')} its "
+                    f"12-month average as it does now, the first print jumped {float(odds['required_jump']):.1f} pp or "
+                    f"more in {odds['hits']} of {odds['months']} months ({_odds(odds['probability'])})."
+                )
+            lines.append(line)
             lines.append("That alone is a watch, not risk-off: the S&P must also close a month below its 10-month average.")
         payroll = forecasts.get(("payroll_change", "core"))
         if payroll and payroll.get("range_80"):
@@ -285,12 +299,16 @@ def _meaning(
         trigger = triggers.get("industrial_production")
         if trigger:
             drop = float(trigger["threshold_change_pct"])
+            odds = trigger.get("odds")
+            history = (
+                f" First prints fell that much in {odds['hits']} of {odds['months']} months since 1990 ({_odds(odds['probability'])})."
+                if odds
+                else ""
+            )
             if drop < 0:
                 lines.append(
                     f"The overlay's production warning needs output to fall {abs(drop):.1f}% in a single month "
-                    "(YoY to zero), so it is very unlikely to trip on this release."
-                    if drop <= -1.0
-                    else f"The overlay's production warning trips on a monthly fall of {abs(drop):.1f}% or more."
+                    f"(YoY to zero).{history}"
                 )
             else:
                 lines.append(f"Production is already below a year ago unless it rises {drop:.1f}% this month.")
@@ -322,6 +340,28 @@ def _q(label: Any) -> str:
 def _weekday(date: pd.Timestamp) -> pd.Timestamp:
     """Estimated dates are last release plus a month; US data are not released at weekends, so use the Friday."""
     return date - pd.Timedelta(days=date.weekday() - 4) if date.weekday() >= 5 else date
+
+
+def _risk_off_text(triggers: Mapping[str, Any]) -> str:
+    """Risk-off needs a trend break and a macro trigger; summarise the macro odds for the next releases."""
+    macro = [
+        (label, (triggers.get(key) or {}).get("odds"))
+        for key, label in (("unemployment_trend", "unemployment"), ("industrial_production", "production"))
+    ]
+    macro = [(label, odds) for label, odds in macro if odds]
+    if not macro:
+        return ""
+    parts = " and ".join(f"{label} {_odds(odds['probability'])}" for label, odds in macro)
+    return f"Risk-off also needs a macro trigger; historical odds on the next releases: {parts}."
+
+
+def _odds(probability: Any) -> str:
+    value = _number(probability)
+    if value is None:
+        return "n/a"
+    if value < 0.01:
+        return "under 1%"
+    return f"about {100.0 * value:.0f}%"
 
 
 def _detail(rows: Mapping[str, Mapping[str, Any]], indicator: str, label: str, unit: str | None = None) -> float | None:

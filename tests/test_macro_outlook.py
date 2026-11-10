@@ -31,9 +31,15 @@ def _overlay() -> dict:
         "state_label": "Normal",
         "inputs": [{"id": "market_trend", "value": 2.8}, {"id": "industrial_production", "value": 2.2}],
         "triggers": {
-            "market_trend": {"month": "2026-11", "threshold_change_pct": -3.1},
-            "unemployment_trend": {"month": "2026-11", "threshold_rate": 4.3545, "latest_rate": 4.1},
-            "industrial_production": {"month": "2026-10", "threshold_change_pct": -2.6},
+            "market_trend": {"month": "2026-11", "threshold_change_pct": -3.1, "odds": {"probability": 0.22}},
+            "unemployment_trend": {
+                "month": "2026-11", "threshold_rate": 4.3545, "latest_rate": 4.1, "published_threshold": 4.4,
+                "odds": {"probability": 8 / 296, "hits": 8, "months": 296, "required_jump": 0.3, "starting_state": "at or below"},
+            },
+            "industrial_production": {
+                "month": "2026-10", "threshold_change_pct": -2.6,
+                "odds": {"probability": 3 / 441, "hits": 3, "months": 441},
+            },
         },
     }
 
@@ -63,12 +69,12 @@ def test_outlook_orders_releases_and_explains_what_would_change() -> None:
     assert [r["id"] for r in outlook["releases"]] == ["industrial_production", "jobs", "cpi"]
     jobs = next(r for r in outlook["releases"] if r["id"] == "jobs")
     assert jobs["date"] == "2026-12-04"  # a Sunday estimate moves to the Friday
-    assert "4.4% or higher" in jobs["meaning"][0]
+    assert "4.4% or higher" in jobs["meaning"][0] and "8 of 296 months (about 3%)" in jobs["meaning"][0]
     assert any("negative payroll" in line for line in jobs["meaning"])
     cpi = next(r for r in outlook["releases"] if r["id"] == "cpi")
     assert cpi["forecasts"][0]["range_80"] == [0.02, 0.68]
     assert "+0.2 pp" in cpi["meaning"][0] and "already rising" in cpi["meaning"][1]
-    assert "fall 2.6%" in outlook["releases"][0]["meaning"][0]
+    assert "fall 2.6%" in outlook["releases"][0]["meaning"][0] and "3 of 441 months" in outlook["releases"][0]["meaning"][0]
 
 
 def test_outlook_states_regime_conviction_and_risk_distance() -> None:
@@ -79,7 +85,8 @@ def test_outlook_states_regime_conviction_and_risk_distance() -> None:
     assert "low conviction" in outlook["headline"] and "Quad" not in outlook["headline"]
     assert [a["name"] for a in outlook["ahead"]] == ["Reflation", "Deflation"]
     risk = next(item for item in outlook["now"] if item["label"] == "Equity risk")
-    assert "3.1% below today's level" in risk["text"]
+    assert "3.1% below today's level" in risk["text"] and "about 22% by month-end" in risk["text"]
+    assert "unemployment about 3% and production under 1%" in risk["text"]
     jobs = next(item for item in outlook["now"] if item["label"] == "Jobs")
     assert "+137k" in jobs["text"]
 

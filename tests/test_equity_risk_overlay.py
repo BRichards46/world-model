@@ -116,3 +116,30 @@ def test_triggers_give_the_levels_that_would_flip_each_signal() -> None:
     closes = pd.Series([100.0] * 9 + [110.0], index=pd.date_range("2025-01-31", periods=10, freq="ME"))
     market = market_trigger(closes, 10, pd.Timestamp("2025-10-15"))
     assert market["month"] == "2025-10" and abs(market["threshold_change_pct"] - (100.0 / 110.0 - 1.0) * 100.0) < 1e-9
+
+
+def test_overlay_attaches_first_print_odds_when_vintages_are_given() -> None:
+    market_dates = pd.date_range("2025-01-31", periods=16, freq="ME")
+    history = chain_price_total_return(pd.Series([100.0 + index for index in range(16)], index=market_dates))
+    dates = pd.date_range("2025-01-01", periods=16, freq="MS")
+    series = _macro_series(dates)
+    series["UNRATE"] = pd.Series([4.0] * 16, index=dates)
+    releases = [date + pd.DateOffset(months=1, days=4) for date in dates]
+    unrate = pd.DataFrame(
+        {
+            "observation_date": dates,
+            "value": [4.0] * 15 + [4.3],
+            "realtime_start": releases,
+            "realtime_end": pd.Timestamp("2099-12-31"),
+        }
+    )
+    result = compute_equity_risk_overlay(
+        series, history, "2026-04-30", {"moving_average_months": 10, "trigger_odds_start": "2025-01-01"},
+        vintages={"UNRATE": unrate},
+    )
+    trigger = result["triggers"]["unemployment_trend"]
+    assert trigger["published_threshold"] == 4.2  # 4.0 flat: X > (1.2 + 44) / 11 = 4.109
+    odds = trigger["odds"]
+    # Only the 5 months with a full 12-month history before them can be classified by starting state;
+    # one of them (the last, 4.0 -> 4.3) jumped at least the 0.2 pp needed.
+    assert odds["hits"] == 1 and odds["months"] == 5 and abs(odds["required_jump"] - 0.2) < 1e-9

@@ -121,6 +121,7 @@ class MacroDashboardEngine:
                 load_equity_benchmark_history(self.data_roots, overlay_config),
                 as_of_date,
                 overlay_config,
+                vintages={key: vintage_by_id[key] for key in ("UNRATE", "INDPRO") if key in vintage_by_id},
             )
             if overlay_config.get("enabled", False)
             else {}

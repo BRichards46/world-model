@@ -102,6 +102,8 @@ equity_risk_overlay:
   # Unemployment warns only when it is more than this many points above its 12-month average.
   # 0.1 was the strongest GTT setting with industrial production (docs/gtt_threshold_validation.md).
   unemployment_buffer_pp: 0.1
+  # Historical odds of each trigger being crossed by the next release use data from this date.
+  trigger_odds_start: "1990-01-01"
 
 # Read-only summaries of the standalone point-in-time market-relevance screen.
 # These findings appear in drill-downs and do not affect dashboard scores.

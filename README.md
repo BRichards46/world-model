@@ -80,8 +80,24 @@ The dashboard opens with an outlook (`outlook.json`, built by
 - **Coming up:** each scheduled release with our forecast, 50% and 80% ranges
   from the model's last five years of out-of-sample misses, and what the print
   would change. That includes the exact level that would trip an overlay
-  signal (for example the unemployment rate that crosses the 0.1 pp buffer)
-  and the monthly CPI pace each quarter needs for inflation to accelerate.
+  signal (for example the unemployment rate that crosses the 0.1 pp buffer),
+  its historical odds, and the monthly CPI pace each quarter needs for
+  inflation to accelerate.
+- **Trigger odds** (in `risk_overlay.json` under `triggers`, from
+  `world_model.features.trigger_odds`):
+  - **Unemployment and industrial production:** how often the first print
+    moved at least that much since 1990. Each change is measured within one
+    release, so revisions and index rebasing don't distort it. Unemployment
+    only counts months that started on the same side of the 12-month average
+    as today, because jumps are about six times as common once it is already
+    rising.
+  - **S&P trend break:** every past stretch with the same number of trading
+    days left in the month, scaled by volatility, compared against today's
+    threshold scaled by today's volatility. Holidays are ignored when
+    counting days.
+  - Risk-off needs a trend break and a macro trigger together; the outlook
+    reports the odds separately rather than multiplying them, since they are
+    not independent.
 
 Below it, a "What to do now" panel shows only validated signals: the equity
 risk overlay, 6–12 month trend on the main futures, and option pricing

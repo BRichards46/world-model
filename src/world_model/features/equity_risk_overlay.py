@@ -1,10 +1,18 @@
 from __future__ import annotations
 
+import math
 from typing import Any, Mapping
 
 import pandas as pd
 
 from world_model.features.monthly_windows import fill_missing_months, pct_change_months, trailing_average
+from world_model.features.trigger_odds import (
+    DEFAULT_START,
+    first_print_changes,
+    frequency_at_least,
+    frequency_at_most,
+    market_break_odds,
+)
 
 
 def compute_equity_risk_overlay(
@@ -12,8 +20,12 @@ def compute_equity_risk_overlay(
     market_history: pd.DataFrame,
     as_of: str | pd.Timestamp,
     config: Mapping[str, Any],
+    vintages: Mapping[str, pd.DataFrame] | None = None,
 ) -> dict[str, Any]:
     """Build the current GTT-style equity risk state from explicit thresholds.
+
+    ``vintages`` (FRED vintage tables for UNRATE and INDPRO) are optional; with them, each trigger also
+    carries the historical odds of being crossed by the next release.
 
     ``market_history`` is the chained S&P 500 history from
     :func:`world_model.data.benchmarks.load_equity_benchmark_history` and must
@@ -101,14 +113,72 @@ def compute_equity_risk_overlay(
             _input("manufacturing_hours", "Manufacturing hours", hours_gap, "hours vs 12m avg", hours_warning, "below average", _date(hours), role="early warning"),
             _input("real_durable_orders", "Real durable orders", orders_growth, "% YoY", orders_warning, "contracting", _date(real_orders), role="confirmation"),
         ],
-        "triggers": {
-            "market_trend": market_trigger(monthly, window, as_of_date),
-            "unemployment_trend": unemployment_trigger(unemployment, unemployment_buffer),
-            "industrial_production": industrial_production_trigger(_series(series_by_id, "INDPRO", as_of_date)),
-        },
+        "triggers": _with_odds(
+            {
+                "market_trend": market_trigger(monthly, window, as_of_date),
+                "unemployment_trend": unemployment_trigger(unemployment, unemployment_buffer),
+                "industrial_production": industrial_production_trigger(_series(series_by_id, "INDPRO", as_of_date)),
+            },
+            history,
+            as_of_date,
+            unemployment_gap,
+            vintages or {},
+            str(config.get("trigger_odds_start", DEFAULT_START)),
+        ),
         "source_note": "Norgate $SPX price returns are used before $SPXTR total-return history becomes available; total returns are used thereafter.",
         "data_warnings": data_warnings,
     }
+
+
+def _with_odds(
+    triggers: dict[str, dict[str, Any] | None],
+    history: pd.DataFrame,
+    as_of: pd.Timestamp,
+    unemployment_gap: float | None,
+    vintages: Mapping[str, pd.DataFrame],
+    start: str,
+) -> dict[str, dict[str, Any] | None]:
+    """Attach historical odds to each trigger. Each odds entry says what history it rests on."""
+    market = triggers.get("market_trend")
+    if market:
+        odds = market_break_odds(history["normalized_index"], market["threshold_change_pct"], as_of, start)
+        if odds:
+            market["odds"] = {
+                **odds,
+                "basis": f"S&P moves over the {odds['trading_days_left']} trading days left in the month since "
+                f"{start[:4]}, scaled to today's {odds['annualized_volatility']:.0f}% volatility",
+            }
+
+    unemployment = triggers.get("unemployment_trend")
+    if unemployment and "UNRATE" in vintages:
+        published = _next_published_level(unemployment["threshold_rate"])
+        unemployment["published_threshold"] = published
+        jump = published - unemployment["latest_rate"]
+        changes = first_print_changes(vintages["UNRATE"], start)
+        above = unemployment_gap is not None and unemployment_gap > 0.0
+        same_state = changes[changes["prior_gap"] > 0.0] if above else changes[changes["prior_gap"] <= 0.0]
+        odds = frequency_at_least(same_state["change"], jump - 0.05)
+        if odds:
+            unemployment["odds"] = {
+                **odds,
+                "required_jump": jump,
+                "starting_state": "above" if above else "at or below",
+                "basis": f"first-print monthly changes since {start[:4]}, in months when unemployment started "
+                f"{'above' if above else 'at or below'} its 12-month average",
+            }
+
+    production = triggers.get("industrial_production")
+    if production and "INDPRO" in vintages:
+        changes = first_print_changes(vintages["INDPRO"], start, percent=True)
+        odds = frequency_at_most(changes["change"], production["threshold_change_pct"])
+        if odds:
+            production["odds"] = {**odds, "basis": f"first-print monthly changes since {start[:4]}"}
+    return triggers
+
+
+def _next_published_level(threshold: float) -> float:
+    """Smallest one-decimal reading strictly above ``threshold`` (unemployment is published to 0.1)."""
+    return round(math.floor(threshold * 10.0 + 1e-9) / 10.0 + 0.1, 1)
 
 
 def market_trigger(monthly: pd.Series, window: int, as_of: pd.Timestamp) -> dict[str, Any] | None:
