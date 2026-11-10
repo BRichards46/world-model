@@ -483,7 +483,10 @@ def _quarterly_growth(series: dict[str, pd.Series], series_ids: list[str]) -> pd
 def _inflation_yoy_mom_change(series: dict[str, pd.Series], series_ids: list[str]) -> pd.DataFrame:
     """Use the familiar YoY rate for level and the latest MoM turn for velocity."""
     values = _regularize(series[series_ids[0]], "M")
-    level = _annualized_growth(values, values.shift(12), periods_per_year=1.0)
+    # A month that was never published (October 2025 CPI) has no YoY of its own, but it is still a valid
+    # comparison base a year later: log-interpolate interior gaps for the base only.
+    base = _interpolated_interior(values)
+    level = _annualized_growth(values, base.shift(12), periods_per_year=1.0)
     monthly_rate = _annualized_growth(values, values.shift(1), periods_per_year=1.0)
     velocity = monthly_rate - monthly_rate.shift(1)
     return _metric_frame(level, velocity)
@@ -558,6 +561,12 @@ def _annualized_growth(current: pd.Series, prior: pd.Series, periods_per_year: f
 
 def _metric_frame(level: pd.Series, velocity: pd.Series) -> pd.DataFrame:
     return pd.DataFrame({"level_value": level.astype(float), "velocity_value": velocity.astype(float)})
+
+
+def _interpolated_interior(values: pd.Series) -> pd.Series:
+    """Log-interpolate interior gaps of a positive series; leading and trailing gaps stay missing."""
+    positive = values.where(values > 0.0)
+    return np.exp(np.log(positive).interpolate(method="linear", limit_area="inside"))
 
 
 def _regularize(series: pd.Series, frequency: str) -> pd.Series:

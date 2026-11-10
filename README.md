@@ -99,6 +99,13 @@ The dashboard opens with an outlook (`outlook.json`, built by
     reports the odds separately rather than multiplying them, since they are
     not independent.
 
+The Equity risk line pairs the overlay's stance with a risk tier, so
+"invested" doesn't read as "safe". The tier is how often a worst-decile
+3-month drawdown followed months in the same state since 1972, with the
+invested state split by your legacy trigger count. It also flags slowing
+production with elevated core inflation. This is descriptive; see
+[`docs/equity_risk_context.md`](docs/equity_risk_context.md).
+
 Below it, a "What to do now" panel shows only validated signals: the equity
 risk overlay, 6–12 month trend on the main futures, and option pricing
 (implied vs expected realized vol). Everything else on the page is labeled

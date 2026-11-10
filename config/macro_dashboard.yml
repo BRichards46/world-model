@@ -105,6 +105,25 @@ equity_risk_overlay:
   # Historical odds of each trigger being crossed by the next release use data from this date.
   trigger_odds_start: "1990-01-01"
 
+# Descriptive risk context for the overlay state (src/world_model/states/equity_risk_context.py).
+# Tiers come from how often a worst-decile 3-month drawdown followed each state since `start`.
+equity_risk_context:
+  enabled: true
+  start: "1972-09-01"
+  horizon_days: 63
+  worst_share: 0.10
+  # Your legacy trigger levels; the invested state is split by whether at least `legacy_at_least` warn.
+  legacy_triggers:
+    indpro_yoy: ["<=", 1.0]
+    payems_yoy: ["<=", 1.0]
+    unemployment_gap: [">", 0.1]
+    housing_lf_yoy: ["<=", -10.0]
+    cpi_yoy: [">=", 2.5]
+  legacy_at_least: 2
+  # Slowing production with elevated core inflation (docs/macro_regime_validation.md).
+  regime_summary: outputs/macro_regime_validation/macro_regime_summary.csv
+  elevated_percentile: 60
+
 # Read-only summaries of the standalone point-in-time market-relevance screen.
 # These findings appear in drill-downs and do not affect dashboard scores.
 market_relevance:

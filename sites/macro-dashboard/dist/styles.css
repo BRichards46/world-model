@@ -93,6 +93,11 @@ button { color: inherit; }
 .risk-state-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--activity); }
 .risk-overlay.state-macro_watch .risk-state-dot, .risk-overlay.state-market_warning .risk-state-dot { background: var(--warning); }
 .risk-overlay.state-defensive .risk-state-dot, .risk-overlay.state-high_conviction .risk-state-dot { background: var(--danger); }
+.risk-tier { padding: 2px 7px; border: 1px solid var(--line); color: var(--muted); font: 600 9px var(--mono); letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; }
+.risk-tier.positive { border-color: color-mix(in srgb, var(--activity) 45%, var(--line)); color: var(--activity); }
+.risk-tier.warning { border-color: color-mix(in srgb, var(--warning) 50%, var(--line)); color: var(--warning); background: color-mix(in srgb, var(--warning) 8%, transparent); }
+.risk-tier.negative { border-color: color-mix(in srgb, var(--danger) 50%, var(--line)); color: var(--danger); background: color-mix(in srgb, var(--danger) 8%, transparent); }
+.risk-state-line { flex-wrap: wrap; }
 .risk-state p { max-width: 480px; margin: 8px 0 6px; color: var(--text); font-size: 11px; line-height: 1.45; }
 .risk-state > small { color: var(--muted); font-size: 9px; line-height: 1.4; }
 .risk-inputs { display: grid; grid-template-columns: repeat(5, minmax(120px, 1fr)); }

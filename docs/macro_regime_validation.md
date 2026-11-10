@@ -39,8 +39,12 @@ The October 23, 2026 run produced 72 test variants:
 
 ## Dashboard interpretation
 
-The dashboard no longer shows this study (the Assets tab was removed in
-November 2026), and `run_macro.sh` no longer refreshes it. When it is shown, an
+`run_macro.sh` refreshes this study daily again (since November 10, 2026). The
+dashboard's equity risk context uses its surviving elevated-inflation pairs.
+When slowing production and an elevated core inflation measure are both on,
+the outlook says so and quotes the study's volatility and drawdown
+differences. See [`equity_risk_context.md`](equity_risk_context.md). The older
+Assets tab display described below was removed in November 2026. When it is shown, an
 **Aligned macro read** appears when a validated additive pair is currently
 active and its active historical observations had worse risk outcomes. This is a confidence/hierarchy layer, not a new independent signal.
 The evidence label explicitly says `interaction not incremental` so the display

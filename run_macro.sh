@@ -67,6 +67,10 @@ echo "Building directional momentum data..."
 echo "Building premium-selling suitability data..."
 "$PYTHON" -m world_model.cli.premium_selling
 
+echo "Refreshing the production-and-inflation risk study..."
+"$PYTHON" -m world_model.cli.macro_regime_validation
+echo "Describing risk for the current overlay state..."
+"$PYTHON" -m world_model.cli.equity_risk_context
 echo "Refreshing payroll and inflation release forecasts..."
 "$PYTHON" -m world_model.cli.macro_release_forecast
 echo "Writing the outlook summary..."

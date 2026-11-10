@@ -307,3 +307,16 @@ def _synthetic_series() -> dict[str, pd.Series]:
         "CLF16OV": pd.Series(160000.0 + np.arange(len(monthly)) * 20.0, index=monthly),
         "MORTGAGE30US": pd.Series(5.0 + 0.5 * np.sin(np.arange(len(weekly)) / 25.0), index=weekly),
     }
+
+
+def test_inflation_yoy_bridges_an_unpublished_base_month_only() -> None:
+    index = pd.date_range("2024-01-01", periods=15, freq="MS")
+    values = pd.Series(100.0 * np.exp(np.arange(15) * 0.002), index=index)
+    gap = index[2]  # never published; its own YoY and MoM stay missing
+    published = values.drop(gap)
+    definition = {"id": "inflation", "series_ids": ["TEST"], "frequency": "monthly", "recipe": "inflation_yoy_mom_change"}
+
+    result = compute_native_indicator_history(definition, {"TEST": published}, _short_history_config())
+    by_date = result.set_index("observation_date") if "observation_date" in result.columns else result
+    expected = 100.0 * (values.iloc[14] / values.iloc[2] - 1.0)  # base log-interpolated between its neighbours
+    assert np.isclose(by_date["level_value"].iloc[-1], expected)

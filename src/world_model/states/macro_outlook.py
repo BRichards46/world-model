@@ -39,8 +39,10 @@ def build_macro_outlook(
     overlay: Mapping[str, Any] | None,
     releases: Mapping[str, Any] | None,
     snapshot: Iterable[Mapping[str, Any]],
+    risk_context: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     quad = quad or {}
+    risk_context = risk_context or {}
     overlay = overlay or {}
     rows = {str(row.get("indicator_id")): row for row in snapshot}
     forecasts = {(row["target_id"], row["variant_id"]): row for row in (releases or {}).get("forecasts", [])}
@@ -85,7 +87,7 @@ def build_macro_outlook(
     market = _number(inputs.get("market_trend", {}).get("value"))
     market_trigger = _number((triggers.get("market_trend") or {}).get("threshold_change_pct"))
     if overlay.get("state_label"):
-        text = f"{overlay['state_label']}."
+        text = _stance_text(overlay, risk_context)
         if market is not None:
             text += f" The S&P is {abs(market):.1f}% {'above' if market >= 0 else 'below'} its 10-month average"
             if market_trigger is not None and market >= 0:
@@ -98,6 +100,9 @@ def build_macro_outlook(
         if risk_off:
             text += " " + risk_off
         now.append({"label": "Equity risk", "text": text})
+        detail = _risk_detail(risk_context)
+        if detail:
+            now.append({"label": "Why", "text": detail})
     growth = _growth_text(quarters[current_index] if current_index is not None else None, inputs)
     if growth:
         now.append({"label": "Growth", "text": growth})
@@ -130,7 +135,7 @@ def build_macro_outlook(
 
     return {
         "as_of_date": overlay.get("as_of_date") or quad.get("as_of_date"),
-        "headline": _headline(ahead, overlay),
+        "headline": _headline(ahead, overlay, risk_context),
         "now": now,
         "ahead": ahead,
         "releases": upcoming,
@@ -144,7 +149,7 @@ def build_macro_outlook(
     }
 
 
-def _headline(ahead: list[dict[str, Any]], overlay: Mapping[str, Any]) -> str:
+def _headline(ahead: list[dict[str, Any]], overlay: Mapping[str, Any], risk_context: Mapping[str, Any] | None = None) -> str:
     parts = []
     if ahead:
         current = ahead[0]
@@ -155,7 +160,72 @@ def _headline(ahead: list[dict[str, Any]], overlay: Mapping[str, Any]) -> str:
             f"Next quarter leans {nxt['name']}, {nxt['description']} ({_pct(nxt['probability'])}, {nxt['conviction']} conviction)."
         )
     if overlay.get("state_label"):
-        parts.append(f"Equity risk overlay: {overlay['state_label']}.")
+        parts.append(f"Equity risk: {_stance_text(overlay, risk_context or {}).rstrip('.').lower()}.")
+    return " ".join(parts)
+
+
+STANCE = {
+    "normal": "Stay invested",
+    "macro_watch": "Stay invested, macro on watch",
+    "market_warning": "Watch: trend break without macro confirmation",
+    "defensive": "Reduce risk",
+    "high_conviction": "Reduce risk",
+}
+
+
+def _stance_text(overlay: Mapping[str, Any], risk_context: Mapping[str, Any]) -> str:
+    stance = STANCE.get(str(overlay.get("state_id")), str(overlay.get("state_label", "")))
+    tier = risk_context.get("tier")
+    if not tier:
+        return f"{stance}."
+    if risk_context.get("above_usual_for_stance"):
+        return f"{stance}, but risk is above normal for this stance ({tier} overall)."
+    return f"{stance}; risk is {tier}."
+
+
+def _risk_detail(risk_context: Mapping[str, Any]) -> str:
+    history = risk_context.get("history") or {}
+    states = history.get("states") or {}
+    state = risk_context.get("state")
+    current = states.get(state) if state else None
+    parts = []
+    if current:
+        line = abs(float(history.get("drawdown_line", 0.0))) * 100.0
+        since = str(history.get("start") or "")[:4]
+        episodes = len(current.get("drawdown_episodes") or [])
+        rate = 100.0 * current["worst_drawdown_rate"]
+        lead = ""
+        if risk_context.get("legacy_on"):
+            count, total = risk_context.get("legacy_count"), risk_context.get("legacy_total")
+            lead = f"{count} of your {total} legacy triggers are on ({', '.join(risk_context['legacy_on'])}). "
+        comparison = []
+        for other, label in (("normal", "when the legacy triggers were clear"), ("defensive", "in the defensive state")):
+            if other != state and other in states:
+                comparison.append(f"{100.0 * states[other]['worst_drawdown_rate']:.0f}% {label}")
+        parts.append(
+            f"{lead}Since {since}, a 3-month drawdown of {line:.1f}% or worse followed {rate:.0f}% of months like this "
+            f"({episodes} separate episode{'s' if episodes != 1 else ''})"
+            + (f", against {' and '.join(comparison)}." if comparison else ".")
+        )
+    production = risk_context.get("production_inflation") or {}
+    if production.get("active"):
+        measure = next((m for m in production.get("measures", []) if m.get("elevated") and m.get("effects")), None)
+        if measure:
+            effects = {(e["target"], e["horizon"]): e for e in measure["effects"]}
+            volatility = effects.get(("future_volatility", "three_months")) or effects.get(("future_volatility", "one_month"))
+            drawdown = effects.get(("max_drawdown", "one_month"))
+            pieces = []
+            if volatility:
+                horizon = "3-month" if volatility["horizon"] == "three_months" else "1-month"
+                pieces.append(f"{horizon} volatility averaged {100 * volatility['active']:.1f}% vs {100 * volatility['inactive']:.1f}%")
+            if drawdown:
+                pieces.append(f"1-month drawdowns {100 * drawdown['active']:.1f}% vs {100 * drawdown['inactive']:.1f}%")
+            start = min(e["sample_start"] for e in measure["effects"])[:4]
+            parts.append(
+                f"Slowing industrial production with elevated {measure['label']} is also on: since {start}, "
+                + " and ".join(pieces)
+                + " when both were on."
+            )
     return " ".join(parts)
 
 

@@ -94,3 +94,33 @@ def test_outlook_states_regime_conviction_and_risk_distance() -> None:
 def test_outlook_tolerates_missing_payloads() -> None:
     outlook = build_macro_outlook(None, None, None, [])
     assert outlook["releases"] == [] and outlook["ahead"] == [] and outlook["now"] == []
+
+
+def test_outlook_states_stance_risk_tier_and_why() -> None:
+    risk_context = {
+        "state": "normal_legacy", "tier": "average", "above_usual_for_stance": True,
+        "legacy_count": 2, "legacy_total": 5, "legacy_on": ["payrolls", "CPI"],
+        "history": {
+            "start": "1972-09", "drawdown_line": -0.1345,
+            "states": {
+                "normal": {"worst_drawdown_rate": 0.034, "drawdown_episodes": ["1990-06"]},
+                "normal_legacy": {"worst_drawdown_rate": 0.118, "drawdown_episodes": ["1979-12", "1987-07", "1990-07", "2011-05", "2025-01"]},
+                "defensive": {"worst_drawdown_rate": 0.36, "drawdown_episodes": []},
+            },
+        },
+        "production_inflation": {
+            "active": True,
+            "measures": [{"label": "core PCE", "elevated": True, "effects": [
+                {"target": "future_volatility", "horizon": "three_months", "active": 0.127, "inactive": 0.114, "sample_start": "2005-10"},
+            ]}],
+        },
+    }
+    overlay = {**_overlay(), "state_id": "normal"}
+    outlook = build_macro_outlook(_quad(), overlay, _releases(), _snapshot(), risk_context)
+    risk = next(item for item in outlook["now"] if item["label"] == "Equity risk")
+    assert risk["text"].startswith("Stay invested, but risk is above normal for this stance (average overall).")
+    why = next(item for item in outlook["now"] if item["label"] == "Why")["text"]
+    assert "2 of your 5 legacy triggers are on (payrolls, CPI)" in why
+    assert "followed 12% of months like this (5 separate episodes), against 3% when" in why and "36% in the defensive state" in why
+    assert "elevated core PCE is also on: since 2005, 3-month volatility averaged 12.7% vs 11.4%" in why
+    assert "risk is above normal" in outlook["headline"]

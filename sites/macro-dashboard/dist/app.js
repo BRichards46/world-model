@@ -76,11 +76,12 @@ async function init() {
       const response = await fetch(path, { cache: "no-store" }).catch(() => null);
       return response?.ok ? response.json() : null;
     };
-    [state.quad, state.quadAssets, state.releases, state.outlook] = await Promise.all([
+    [state.quad, state.quadAssets, state.releases, state.outlook, state.riskContext] = await Promise.all([
       optional("./data/growth_inflation_quad.json"),
       optional("./data/quad_asset_performance.json"),
       optional("./data/release_forecasts.json"),
       optional("./data/outlook.json"),
+      optional("./data/risk_context.json"),
     ]);
     if (!snapshotResponse.ok || !historyResponse.ok || !overlayResponse.ok || !momentumResponse.ok || !premiumResponse.ok) throw new Error("Dashboard data files are unavailable.");
     state.rows = await snapshotResponse.json();
@@ -168,10 +169,11 @@ function renderRiskOverlay() {
   container.hidden = false;
   const inputs = Array.isArray(overlay.inputs) ? overlay.inputs : [];
   container.className = `risk-overlay state-${overlay.state_id}`;
+  const risk = riskSummary(overlay);
   container.innerHTML = `<div class="risk-state">
     <div class="eyebrow">EQUITY RISK OVERLAY</div>
-    <div class="risk-state-line"><span class="risk-state-dot"></span><h2>${escapeHtml(overlay.state_label)}</h2></div>
-    <p>${escapeHtml(overlay.message)}</p>
+    <div class="risk-state-line"><span class="risk-state-dot"></span><h2>${escapeHtml(risk.stance)}</h2>${risk.chip}</div>
+    <p>${escapeHtml(overlay.message)}${risk.detail ? ` ${escapeHtml(risk.detail)}` : ""}</p>
     <small>${escapeHtml(overlay.method_note)}</small>
     ${(overlay.data_warnings || []).map((warning) => `<p class="risk-data-warning">${escapeHtml(warning)}</p>`).join("")}
   </div>
@@ -461,6 +463,29 @@ function renderSummary() {
 
 // --- Decision panel: validated signals only -------------------------------------------------
 
+const STANCE_LABEL = {
+  normal: "Invested",
+  macro_watch: "Invested · macro watch",
+  market_warning: "Trend break · unconfirmed",
+  defensive: "Defensive",
+  high_conviction: "Defensive · high conviction",
+};
+
+function riskSummary(overlay) {
+  const context = state.riskContext;
+  const stance = STANCE_LABEL[overlay.state_id] || overlay.state_label;
+  const tier = context?.tier || null;
+  const aboveUsual = Boolean(context?.above_usual_for_stance);
+  const tierText = tier ? (aboveUsual ? "risk above normal" : `${tier} risk`) : "";
+  const tone = !tier ? "" : aboveUsual || tier === "average" ? "warning" : tier === "below average" ? "positive" : "negative";
+  const chip = tier ? `<span class="risk-tier ${tone}" title="${escapeHtml(context.note || "")}">${escapeHtml(tierText)}</span>` : "";
+  const record = context?.history?.states?.[context.state];
+  const detail = record
+    ? `Historically ${Math.round(record.worst_drawdown_rate * 100)}% of months in this state were followed by a worst-decile 3-month drawdown (average 10%).`
+    : "";
+  return { stance, tier, aboveUsual, tierText, chip, detail };
+}
+
 const OVERLAY_ACTION = {
   normal: { tone: "positive", action: "No action: stay invested." },
   macro_watch: { tone: "warning", action: "Watch: a macro warning without price confirmation." },
@@ -579,7 +604,11 @@ function renderDecision() {
     return;
   }
   container.hidden = false;
-  const action = OVERLAY_ACTION[overlay.state_id] || { tone: "neutral", action: overlay.message };
+  const base = OVERLAY_ACTION[overlay.state_id] || { tone: "neutral", action: overlay.message };
+  const risk = riskSummary(overlay);
+  const action = risk.aboveUsual && base.tone === "positive"
+    ? { tone: "warning", action: `${base.action.replace(/\.$/, "")}, but risk is above normal for this stance.` }
+    : base;
   const inputs = Object.fromEntries((overlay.inputs || []).map((input) => [input.id, input]));
   const market = numberOrNull(inputs.market_trend?.value);
   const unemployment = numberOrNull(inputs.unemployment_trend?.value);
@@ -608,7 +637,7 @@ function renderDecision() {
   container.innerHTML = `<header><div><span class="eyebrow">WHAT TO DO NOW · VALIDATED SIGNALS ONLY</span><h2 class="decision-headline ${action.tone}">${escapeHtml(action.action)}</h2></div>
       <p>Everything below the line is context. The quad, monitor percentiles, and option strategy leans are not trading signals.</p></header>
     <div class="decision-grid">
-      <article class="decision-card ${action.tone}"><span>Equity risk · ${escapeHtml(overlay.state_label)}</span>
+      <article class="decision-card ${action.tone}"><span>Equity risk · ${escapeHtml(risk.stance)}${risk.tier ? ` · ${escapeHtml(risk.tierText)}` : ""}</span>
         <p>${escapeHtml(distance)}.</p>
         <small>Risk-off needs the S&amp;P below its 10-month average <em>and</em> unemployment more than ${escapeHtml(buffer.toFixed(1))} pp above its 12-month average or industrial production contracting. Validated on future S&amp;P volatility and drawdowns across 17 separate stress periods.</small></article>
       <article class="decision-card"><span>Trend · 6–12 months</span>
