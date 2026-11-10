@@ -35,6 +35,7 @@ def test_logic_filters_combine_growth_and_inflation() -> None:
     )
     flags = build_logic_filters(values)
     assert flags["growth_weak"].tolist()[:3] == [0.0, 1.0, 1.0]
+    assert flags["growth_weak_strict"].tolist()[:3] == [0.0, 0.0, 0.0]
     assert flags["growth_healthy"].tolist()[:3] == [1.0, 0.0, 0.0]
     assert np.isnan(flags["growth_healthy"].iloc[3])
     assert flags["growth_healthy_and_cpi_above_2_5"].tolist()[:3] == [1.0, 0.0, 0.0]

@@ -90,6 +90,24 @@ Matched sample, September 1972 onward. Baselines: buy-and-hold 9.7% CAGR,
     year, which makes GTT behave like plain trend following.
   - Durable orders pass 12–13/16 since 1999, but industrial production OR
     durable orders passes only 7–9/16.
+- **AND rules (danger only when both warn) trade coverage for precision, and
+  lose.**
+  - Precision rises a little: industrial production AND unemployment is
+    37% vs 33% for the OR rule.
+  - Time in cash halves (6% vs 12%), but the rule misses episodes.
+  - From 1972 it passes 10–11/16 tests (vs 16/16), with a deeper drawdown
+    (−33% vs −30%) and a lower Sharpe (0.57 vs 0.64).
+  - Industrial production AND unemployment behaves almost exactly like
+    industrial production alone: unemployment rarely warns without it.
+  - ANDs with real retail sales have the highest precision (51–56%) but are
+    defensive only 4–7% of the time. They pass 0/16 and draw down 36%.
+  - Industrial production AND durable orders is the one AND that holds up
+    since 2001 (13/16, Sharpe 0.81). It still trails the OR rule (Sharpe
+    0.89) and rests on about three stress eras.
+  - Why: GTT already requires the price trend to confirm, so it is an AND
+    with trend by construction. Its value comes from the macro side catching
+    enough episodes, and adding more confirmation mostly removes good
+    warnings.
 - **Counts:**
   - "2 or more" of the long-history growth filters is robust (16/16).
   - "1 or more" is just an OR and spends too much time in cash.

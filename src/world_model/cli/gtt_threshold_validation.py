@@ -127,6 +127,7 @@ def write_report(catalog: pd.DataFrame, risk: pd.DataFrame, backtest: pd.DataFra
         lines += [f"## {label}", "", "### Baselines", "", markdown_table(base[["filter", "cagr", "max_drawdown", "sharpe", "time_in_cash", "switches_per_year"]]), ""]
         lines += ["### Zero lines vs your thresholds", "", table(frame[frame["family"] == "single"].sort_values(["metric", "kind"])), ""]
         lines += ["### OR combinations", "", table(frame[frame["family"] == "or"]), ""]
+        lines += ["### AND combinations", "", table(frame[frame["family"] == "and"]), ""]
         lines += ["### Trigger counts", "", table(frame[frame["family"] == "count"]), ""]
         sweep = frame[frame["family"].isin(["single", "sweep"])].copy()
         if not sweep.empty:

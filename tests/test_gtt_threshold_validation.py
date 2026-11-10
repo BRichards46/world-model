@@ -7,6 +7,7 @@ from world_model.states.gtt_threshold_validation import (
     Threshold,
     build_filters,
     build_point_in_time_values,
+    combine_and,
     combine_or,
     count_at_least,
     monthly_timing_backtest,
@@ -53,6 +54,14 @@ def test_or_and_count_need_every_input_known() -> None:
     assert count_at_least([a, b, c], 2).tolist()[:3] == [1.0, 0.0, 1.0]
 
 
+def test_and_needs_every_input_warning_and_known() -> None:
+    a = pd.Series([1.0, 1.0, 0.0, np.nan])
+    b = pd.Series([1.0, 0.0, 0.0, 1.0])
+    combined = combine_and([a, b])
+    assert combined.tolist()[:3] == [1.0, 0.0, 0.0]
+    assert np.isnan(combined.iloc[3])
+
+
 def test_build_filters_names_singles_sweeps_and_combinations() -> None:
     values = pd.DataFrame({"g": [-1.0, 1.0, 2.0], "u": [0.2, -0.1, 0.0]})
     config = {
@@ -61,6 +70,7 @@ def test_build_filters_names_singles_sweeps_and_combinations() -> None:
             "u": {"danger_operator": ">", "zero_line": 0.0},
         },
         "or_combinations": {"g_or_u": ["g@zero_line", "u@zero_line"]},
+        "and_combinations": {"g_and_u": ["g@zero_line", "u@zero_line"]},
         "counts": {"both": {"members": ["g@your_threshold", "u@zero_line"], "at_least": [2]}},
     }
     flags, catalog = build_filters(values, config)
@@ -68,7 +78,8 @@ def test_build_filters_names_singles_sweeps_and_combinations() -> None:
     assert flags["g@sweep+2"].tolist() == [1.0, 1.0, 1.0]
     assert flags["g_or_u"].tolist() == [1.0, 0.0, 0.0]
     assert flags["both>=2"].tolist() == [1.0, 0.0, 0.0]
-    assert set(catalog["family"]) == {"single", "sweep", "or", "count"}
+    assert flags["g_and_u"].tolist() == [1.0, 0.0, 0.0]
+    assert set(catalog["family"]) == {"single", "sweep", "or", "and", "count"}
 
 
 def test_backtest_moves_to_cash_only_when_trend_and_macro_both_warn() -> None:

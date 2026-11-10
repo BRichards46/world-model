@@ -10,7 +10,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from world_model.states.gtt_threshold_validation import Threshold, combine_or
+from world_model.states.gtt_threshold_validation import Threshold, combine_and, combine_or
 
 
 def synthetic_treasury_log_returns(yields_pct: pd.Series, maturity_years: float = 10.0) -> pd.Series:
@@ -57,6 +57,7 @@ def build_logic_filters(values: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(
         {
             "growth_weak": growth_weak,
+            "growth_weak_strict": combine_and([indpro_weak, unemployment_weak]),
             "growth_healthy": growth_healthy,
             "indpro_weak": indpro_weak,
             "unemployment_weak": unemployment_weak,

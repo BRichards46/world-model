@@ -144,6 +144,13 @@ def combine_or(flags: list[pd.Series]) -> pd.Series:
     return frame.eq(1.0).any(axis=1).astype(float).where(known)
 
 
+def combine_and(flags: list[pd.Series]) -> pd.Series:
+    """Danger only if every input warns; unknown unless every input is known."""
+    frame = pd.concat(flags, axis=1)
+    known = frame.notna().all(axis=1)
+    return frame.eq(1.0).all(axis=1).astype(float).where(known)
+
+
 def count_at_least(flags: list[pd.Series], minimum: int) -> pd.Series:
     frame = pd.concat(flags, axis=1)
     known = frame.notna().all(axis=1)
@@ -172,6 +179,9 @@ def build_filters(values: pd.DataFrame, config: Mapping[str, Any]) -> tuple[pd.D
     for name, members in config.get("or_combinations", {}).items():
         flags[name] = combine_or([flags[member] for member in members])
         catalog.append({"filter": name, "family": "or", "members": " OR ".join(members)})
+    for name, members in config.get("and_combinations", {}).items():
+        flags[name] = combine_and([flags[member] for member in members])
+        catalog.append({"filter": name, "family": "and", "members": " AND ".join(members)})
     for name, settings in config.get("counts", {}).items():
         members = list(settings["members"])
         for minimum in settings.get("at_least", [1, 2, 3]):

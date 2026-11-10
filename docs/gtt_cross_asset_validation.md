@@ -50,6 +50,8 @@ filter-and-trend combinations per contract and could not be verified.
     lower return than buy-and-hold. The macro filter fixes that by ignoring
     most of those trend breaks.
   - The S&P remains the better place to apply the rule.
+  - The stricter AND version (industrial production AND unemployment) is
+    worse on both: Russell 2/16, Sharpe 0.42; S&P 9/16, Sharpe 0.62.
 - **Treasuries: macro filters add nothing reliable.**
   - Healthy growth does not separate bond downtrends that follow through
     (0/16, lift slightly negative).

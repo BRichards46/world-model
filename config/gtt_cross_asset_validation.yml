@@ -45,6 +45,7 @@ assets:
 logic_filters:
   equity:            # recessions hurt stocks: a growth warning confirms a falling trend
     - growth_weak
+    - growth_weak_strict   # industrial production <= 0 AND unemployment > 12m avg + 0.1 pp
     - indpro_weak
     - unemployment_weak
     - indpro_or_real_retail_weak

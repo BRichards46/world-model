@@ -75,6 +75,16 @@ or_combinations:
   indpro_or_unemployment_or_awhman: [indpro_yoy@zero_line, unemployment_gap@zero_line, awhman_gap@zero_line]
   indpro_or_awhman_or_dgorder_or_retail: [indpro_yoy@zero_line, awhman_gap@zero_line, real_dgorder_yoy@zero_line, real_retail_yoy@zero_line]
 
+# AND = danger only when every member warns (confirmation instead of coverage).
+and_combinations:
+  indpro_and_unemployment: [indpro_yoy@zero_line, unemployment_gap@zero_line]
+  indpro_and_unemployment_buffer: [indpro_yoy@zero_line, unemployment_gap@your_threshold]
+  indpro_and_awhman: [indpro_yoy@zero_line, awhman_gap@zero_line]
+  unemployment_buffer_and_awhman: [unemployment_gap@your_threshold, awhman_gap@zero_line]
+  indpro_and_dgorder: [indpro_yoy@zero_line, real_dgorder_yoy@zero_line]
+  indpro_and_real_retail: [indpro_yoy@zero_line, real_retail_yoy@zero_line]
+  unemployment_buffer_and_real_retail: [unemployment_gap@your_threshold, real_retail_yoy@zero_line]
+
 counts:
   long_history_zero_lines:
     members: [indpro_yoy@zero_line, unemployment_gap@zero_line, awhman_gap@zero_line, payems_yoy@zero_line, housing_lf_yoy@zero_line]
