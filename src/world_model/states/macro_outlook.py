@@ -1,0 +1,356 @@
+"""Plain-language outlook for the top of the macro dashboard.
+
+Built only from the dashboard's own payloads (quad model, risk overlay, release forecasts and monitor rows),
+so every number on it also appears, with its method, elsewhere on the page. The outlook says where the
+regime and risk signals stand, where the quad model projects them, and what each upcoming release would
+need to show to change them.
+"""
+
+from __future__ import annotations
+
+import json
+import math
+from typing import Any, Iterable, Mapping
+
+import pandas as pd
+
+# Regime names used on the dashboard in place of quad numbers.
+QUAD_NAME = {1: "Goldilocks", 2: "Reflation", 3: "Stagflation", 4: "Deflation"}
+
+QUAD_SHORT = {
+    1: "growth up, inflation down",
+    2: "growth up, inflation up",
+    3: "growth down, inflation up",
+    4: "growth down, inflation down",
+}
+
+# (release id, label, monitor row that carries its expected date, forecast rows to show)
+RELEASES: tuple[tuple[str, str, str, tuple[tuple[str, str, str], ...]], ...] = (
+    ("cpi", "CPI", "core_cpi_inflation", (("headline_cpi_mom", "pipeline", "Headline"), ("core_cpi_mom", "pipeline", "Core"))),
+    ("jobs", "Jobs report", "payroll_growth", (("payroll_change", "core", "Payrolls"),)),
+    ("pce", "PCE inflation", "core_pce_inflation", (("core_pce_mom", "pipeline", "Core PCE"),)),
+    ("industrial_production", "Industrial production", "industrial_production", ()),
+    ("gdp", "GDP", "real_gdp_growth", ()),
+)
+
+
+def build_macro_outlook(
+    quad: Mapping[str, Any] | None,
+    overlay: Mapping[str, Any] | None,
+    releases: Mapping[str, Any] | None,
+    snapshot: Iterable[Mapping[str, Any]],
+) -> dict[str, Any]:
+    quad = quad or {}
+    overlay = overlay or {}
+    rows = {str(row.get("indicator_id")): row for row in snapshot}
+    forecasts = {(row["target_id"], row["variant_id"]): row for row in (releases or {}).get("forecasts", [])}
+    quarters = list(quad.get("quarters", []))
+    current_index = next((i for i, q in enumerate(quarters) if q.get("is_current_quarter")), None)
+    realized = [q for q in quarters if q.get("status") == "realized"]
+    horizons = {int(h["horizon"]): h for h in quad.get("backtest", {}).get("horizons", [])}
+    inputs = {item["id"]: item for item in overlay.get("inputs", [])}
+    triggers = overlay.get("triggers", {}) or {}
+
+    ahead = []
+    if current_index is not None:
+        for offset, quarter in enumerate(quarters[current_index : current_index + 3]):
+            probability = _number(quarter.get("probability_top"))
+            hit_rate = _number(horizons.get(offset, {}).get("quad_hit_rate"))
+            quad_id = int(quarter.get("probability_quad") or quarter.get("quad"))
+            ahead.append(
+                {
+                    "quarter": quarter.get("quarter"),
+                    "status": quarter.get("status"),
+                    "quad": quad_id,
+                    "name": QUAD_NAME.get(quad_id, ""),
+                    "description": QUAD_SHORT.get(quad_id, ""),
+                    "probability": probability,
+                    "conviction": _conviction(probability),
+                    "historical_hit_rate": hit_rate,
+                }
+            )
+
+    now = []
+    if realized and ahead:
+        last = realized[-1]
+        current = ahead[0]
+        now.append(
+            {
+                "label": "Regime",
+                "text": f"{_q(last['quarter'])} was {QUAD_NAME.get(int(last['quad']), '')} ({QUAD_SHORT.get(int(last['quad']), '')}). "
+                f"{_q(current['quarter'])} is tracking {current['name']} ({current['description']}), "
+                f"{_pct(current['probability'])} likely.",
+            }
+        )
+    market = _number(inputs.get("market_trend", {}).get("value"))
+    market_trigger = _number((triggers.get("market_trend") or {}).get("threshold_change_pct"))
+    if overlay.get("state_label"):
+        text = f"{overlay['state_label']}."
+        if market is not None:
+            text += f" The S&P is {abs(market):.1f}% {'above' if market >= 0 else 'below'} its 10-month average"
+            if market_trigger is not None and market >= 0:
+                text += f"; a month-end close about {abs(market_trigger):.1f}% below today's level would break that trend"
+            text += "."
+        now.append({"label": "Equity risk", "text": text})
+    growth = _growth_text(quarters[current_index] if current_index is not None else None, inputs)
+    if growth:
+        now.append({"label": "Growth", "text": growth})
+    labor = _labor_text(rows)
+    if labor:
+        now.append({"label": "Jobs", "text": labor})
+    inflation = _inflation_text(rows, quarters[current_index] if current_index is not None else None)
+    if inflation:
+        now.append({"label": "Inflation", "text": inflation})
+
+    upcoming = []
+    for release_id, label, row_id, forecast_keys in RELEASES:
+        row = rows.get(row_id, {})
+        date = row.get("expected_next_release")
+        if not date:
+            continue
+        shown = [_forecast_view(forecasts[key[:2]], key[2]) for key in forecast_keys if key[:2] in forecasts]
+        upcoming.append(
+            {
+                "id": release_id,
+                "label": label,
+                "date": f"{_weekday(pd.Timestamp(date)):%Y-%m-%d}",
+                "date_is_estimate": bool(row.get("expected_next_release_is_estimate")),
+                "reference": _reference(release_id, row, shown),
+                "forecasts": shown,
+                "meaning": _meaning(release_id, quad, quarters, current_index, overlay, rows, forecasts),
+            }
+        )
+    upcoming.sort(key=lambda item: item["date"])
+
+    return {
+        "as_of_date": overlay.get("as_of_date") or quad.get("as_of_date"),
+        "headline": _headline(ahead, overlay),
+        "now": now,
+        "ahead": ahead,
+        "releases": upcoming,
+        "notes": [
+            "Regimes describe the growth and inflation backdrop; they are not trading signals. The equity risk "
+            "overlay is the only validated signal here.",
+            "Forecast ranges come from the model's own out-of-sample misses over the last five years. Only "
+            "core PCE beats a naive forecast; the others are previews.",
+            "Release dates marked ≈ are estimated from the last release and can be off by a few days.",
+        ],
+    }
+
+
+def _headline(ahead: list[dict[str, Any]], overlay: Mapping[str, Any]) -> str:
+    parts = []
+    if ahead:
+        current = ahead[0]
+        parts.append(f"This quarter is tracking {current['name']}: {current['description']} ({_pct(current['probability'])}).")
+    if len(ahead) > 1:
+        nxt = ahead[1]
+        parts.append(
+            f"Next quarter leans {nxt['name']}, {nxt['description']} ({_pct(nxt['probability'])}, {nxt['conviction']} conviction)."
+        )
+    if overlay.get("state_label"):
+        parts.append(f"Equity risk overlay: {overlay['state_label']}.")
+    return " ".join(parts)
+
+
+def _growth_text(current: Mapping[str, Any] | None, inputs: Mapping[str, Any]) -> str:
+    parts = []
+    if current and current.get("growth_assumption_source") == "nowcast" and current.get("growth_assumption_saar") is not None:
+        parts.append(f"The Atlanta Fed nowcast has {_q(current['quarter'])} GDP at {float(current['growth_assumption_saar']):.1f}% annualized.")
+    production = _number(inputs.get("industrial_production", {}).get("value"))
+    if production is not None:
+        parts.append(f"Industrial production is {production:+.1f}% YoY.")
+    return " ".join(parts)
+
+
+def _labor_text(rows: Mapping[str, Mapping[str, Any]]) -> str:
+    rate = _detail(rows, "unemployment_rate", "Latest unemployment rate")
+    payroll = _detail(rows, "payroll_growth", "Three-month average change")
+    parts = []
+    if rate is not None:
+        parts.append(f"Unemployment {rate:.1f}%")
+    if payroll is not None:
+        parts.append(f"payrolls averaging {payroll:+.0f}k a month over three months")
+    return (", ".join(parts) + ".") if parts else ""
+
+
+def _inflation_text(rows: Mapping[str, Mapping[str, Any]], current: Mapping[str, Any] | None) -> str:
+    parts = []
+    core_3m = _detail(rows, "core_cpi_inflation", "Core CPI", unit="% 3m annualized")
+    pce = _detail(rows, "core_pce_inflation", "Core PCE inflation", unit="% YoY")
+    if core_3m is not None:
+        parts.append(f"Core CPI is running {core_3m:.1f}% annualized over three months")
+    if pce is not None:
+        parts.append(f"core PCE is {pce:.1f}% YoY")
+    text = (", ".join(parts) + ".") if parts else ""
+    if current and current.get("inflation_yoy") is not None:
+        text += f" Headline CPI is tracking {float(current['inflation_yoy']):.1f}% YoY for {_q(current['quarter'])}."
+    return text.strip()
+
+
+def _forecast_view(row: Mapping[str, Any], label: str) -> dict[str, Any]:
+    return {
+        "label": label,
+        "reference_month": row.get("reference_month"),
+        "unit": row.get("unit"),
+        "forecast": row.get("forecast"),
+        "range_50": row.get("range_50"),
+        "range_80": row.get("range_80"),
+        "prior": row.get("prior"),
+        "validated": bool(row.get("validated")),
+    }
+
+
+def _reference(release_id: str, row: Mapping[str, Any], shown: list[dict[str, Any]]) -> str | None:
+    if shown and shown[0].get("reference_month"):
+        return f"{pd.Timestamp(shown[0]['reference_month'] + '-01'):%B}"
+    observed = row.get("observation_date")
+    if not observed:
+        return None
+    observed = pd.Timestamp(observed)
+    if release_id == "gdp":
+        following = observed + pd.DateOffset(months=3)
+        return f"Q{following.quarter} {following.year}"
+    return f"{observed + pd.DateOffset(months=1):%B}"
+
+
+def _meaning(
+    release_id: str,
+    quad: Mapping[str, Any],
+    quarters: list[Mapping[str, Any]],
+    current_index: int | None,
+    overlay: Mapping[str, Any],
+    rows: Mapping[str, Mapping[str, Any]],
+    forecasts: Mapping[tuple[str, str], Mapping[str, Any]],
+) -> list[str]:
+    current = quarters[current_index] if current_index is not None else None
+    following = quarters[current_index + 1] if current_index is not None and current_index + 1 < len(quarters) else None
+    triggers = overlay.get("triggers", {}) or {}
+    lines: list[str] = []
+
+    if release_id == "cpi":
+        headline = forecasts.get(("headline_cpi_mom", "pipeline"))
+        month = headline.get("reference_month") if headline else None
+        comp = next((c for c in quad.get("cpi_comps", []) if c.get("month") == month), None)
+        if headline and comp:
+            change = float(headline["forecast"]) - float(comp["comp_mom"])
+            lines.append(
+                f"A year ago this month CPI rose {float(comp['comp_mom']):.2f}%"
+                f"{' (estimated: that month was never published)' if comp.get('comp_interpolated') else ''}, "
+                f"so any print above that lifts headline inflation YoY; our forecast adds about {change:+.1f} pp."
+            )
+        hurdle = _number(current.get("inflation_hurdle_mom")) if current else None
+        if hurdle is not None and hurdle < 0:
+            lines.append(
+                f"{_q(current['quarter'])} inflation is already rising: it would take monthly CPI averaging below "
+                f"{hurdle:.2f}% for the rest of the quarter to stop it."
+            )
+        elif hurdle is not None:
+            lines.append(f"{_q(current['quarter'])} inflation rises if the rest of the quarter averages above {hurdle:.2f}% a month.")
+        next_hurdle = _number(following.get("inflation_hurdle_mom")) if following else None
+        base = _number(quad.get("assumptions", {}).get("inflation_base_mom"))
+        if next_hurdle is not None and base is not None:
+            lines.append(
+                f"{_q(following['quarter'])} inflation rises only if monthly CPI averages above {next_hurdle:.2f}% "
+                f"(the model assumes {base:.2f}%). A run of prints at that pace would undercut the "
+                f"{QUAD_NAME.get(int(following.get('probability_quad') or following.get('quad') or 0), 'current')} lean."
+            )
+        lines.append("Not a risk-overlay input: inflation failed every GTT risk test.")
+
+    elif release_id == "jobs":
+        trigger = triggers.get("unemployment_trend")
+        if trigger:
+            threshold = float(trigger["threshold_rate"])
+            published = math.floor(threshold * 10.0 + 1e-9) / 10.0 + 0.1
+            lines.append(
+                f"The overlay's unemployment warning needs the rate above {threshold:.2f}%, so a print of "
+                f"{published:.1f}% or higher (last {float(trigger['latest_rate']):.1f}%)."
+            )
+            lines.append("That alone is a watch, not risk-off: the S&P must also close a month below its 10-month average.")
+        payroll = forecasts.get(("payroll_change", "core"))
+        if payroll and payroll.get("range_80"):
+            low, high = payroll["range_80"]
+            if high < 0:
+                lines.append("Our range sits entirely below zero, which would be a recession-style print.")
+            elif low < 0:
+                lines.append("The low end of our range is a negative payroll print.")
+
+    elif release_id == "pce":
+        row = forecasts.get(("core_pce_mom", "pipeline"))
+        if row and row.get("validated"):
+            lines.append("The one release forecast that beats a naive model in every test period.")
+        lines.append("The Fed's preferred inflation gauge. Context only: not a regime or risk-overlay input.")
+
+    elif release_id == "industrial_production":
+        trigger = triggers.get("industrial_production")
+        if trigger:
+            drop = float(trigger["threshold_change_pct"])
+            if drop < 0:
+                lines.append(
+                    f"The overlay's production warning needs output to fall {abs(drop):.1f}% in a single month "
+                    "(YoY to zero), so it is very unlikely to trip on this release."
+                    if drop <= -1.0
+                    else f"The overlay's production warning trips on a monthly fall of {abs(drop):.1f}% or more."
+                )
+            else:
+                lines.append(f"Production is already below a year ago unless it rises {drop:.1f}% this month.")
+
+    elif release_id == "gdp":
+        if current and current.get("growth_hurdle_saar") is not None:
+            hurdle = float(current["growth_hurdle_saar"])
+            line = f"{_q(current['quarter'])} growth counts as accelerating unless GDP comes in below {hurdle:.1f}% annualized"
+            if current.get("growth_assumption_saar") is not None:
+                line += f"; the current estimate is {float(current['growth_assumption_saar']):.1f}%"
+            lines.append(line + ".")
+        if following and following.get("growth_hurdle_saar") is not None and following.get("growth_assumption_saar") is not None:
+            need = float(following["growth_hurdle_saar"])
+            expected = float(following["growth_assumption_saar"])
+            verdict = "a coin flip" if abs(expected - need) < 0.25 else "likely" if expected > need else "unlikely"
+            lines.append(
+                f"{_q(following['quarter'])} growth accelerates only above {need:.2f}% annualized; leading indicators "
+                f"point to {expected:.2f}%, so {verdict}."
+            )
+    return lines
+
+
+def _q(label: Any) -> str:
+    """'2026Q4' -> 'Q4 2026'."""
+    text = str(label or "")
+    return f"Q{text[-1]} {text[:4]}" if len(text) == 6 and text[4] == "Q" else text
+
+
+def _weekday(date: pd.Timestamp) -> pd.Timestamp:
+    """Estimated dates are last release plus a month; US data are not released at weekends, so use the Friday."""
+    return date - pd.Timedelta(days=date.weekday() - 4) if date.weekday() >= 5 else date
+
+
+def _detail(rows: Mapping[str, Mapping[str, Any]], indicator: str, label: str, unit: str | None = None) -> float | None:
+    metrics = rows.get(indicator, {}).get("detail_metrics") or []
+    if isinstance(metrics, str):
+        metrics = json.loads(metrics)
+    for metric in metrics:
+        if metric.get("label") == label and (unit is None or metric.get("unit") == unit):
+            return _number(metric.get("value"))
+    return None
+
+
+def _conviction(probability: float | None) -> str:
+    if probability is None:
+        return "unknown"
+    if probability >= 0.7:
+        return "high"
+    if probability >= 0.5:
+        return "moderate"
+    return "low"
+
+
+def _number(value: Any) -> float | None:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if math.isfinite(number) else None
+
+
+def _pct(probability: float | None) -> str:
+    return "n/a" if probability is None else f"{100.0 * probability:.0f}%"

@@ -69,6 +69,8 @@ echo "Building premium-selling suitability data..."
 
 echo "Refreshing payroll and inflation release forecasts..."
 "$PYTHON" -m world_model.cli.macro_release_forecast
+echo "Writing the outlook summary..."
+"$PYTHON" -m world_model.cli.macro_outlook
 
 # Research-only jobs (not shown on the dashboard) run on demand:
 #   macro_regime_validation, macro_regime_performance, macro_regime_forecast,

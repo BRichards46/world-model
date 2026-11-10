@@ -76,10 +76,11 @@ async function init() {
       const response = await fetch(path, { cache: "no-store" }).catch(() => null);
       return response?.ok ? response.json() : null;
     };
-    [state.quad, state.quadAssets, state.releases] = await Promise.all([
+    [state.quad, state.quadAssets, state.releases, state.outlook] = await Promise.all([
       optional("./data/growth_inflation_quad.json"),
       optional("./data/quad_asset_performance.json"),
       optional("./data/release_forecasts.json"),
+      optional("./data/outlook.json"),
     ]);
     if (!snapshotResponse.ok || !historyResponse.ok || !overlayResponse.ok || !momentumResponse.ok || !premiumResponse.ok) throw new Error("Dashboard data files are unavailable.");
     state.rows = await snapshotResponse.json();
@@ -125,6 +126,7 @@ function bindStaticControls() {
 }
 
 function render() {
+  renderOutlook();
   renderDecision();
   renderRiskOverlay();
   renderQuadStrip();
@@ -190,10 +192,10 @@ function riskInputMarkup(input) {
 }
 
 const QUAD_META = {
-  1: { name: "Quad 1", short: "Growth ↑ · Inflation ↓" },
-  2: { name: "Quad 2", short: "Growth ↑ · Inflation ↑" },
-  3: { name: "Quad 3", short: "Growth ↓ · Inflation ↑" },
-  4: { name: "Quad 4", short: "Growth ↓ · Inflation ↓" },
+  1: { name: "Goldilocks", short: "Growth ↑ · Inflation ↓" },
+  2: { name: "Reflation", short: "Growth ↑ · Inflation ↑" },
+  3: { name: "Stagflation", short: "Growth ↓ · Inflation ↑" },
+  4: { name: "Deflation", short: "Growth ↓ · Inflation ↓" },
 };
 
 function quadRows() {
@@ -201,7 +203,7 @@ function quadRows() {
 }
 
 function quadName(quad) { return QUAD_META[quad]?.name || "Unclassified"; }
-function quadBadge(quad, size = "") { return `<span class="quad-badge q${escapeHtml(quad ?? "x")} ${size}">${quad ? `Q${escapeHtml(quad)}` : "—"}</span>`; }
+function quadBadge(quad, size = "") { return `<span class="quad-badge q${escapeHtml(quad ?? "x")} ${size}">${quad ? escapeHtml(quadName(quad)) : "—"}</span>`; }
 function quadPct(value, decimals = 2) { const parsed = numberOrNull(value); return parsed == null ? "n/a" : `${parsed.toFixed(decimals)}%`; }
 function quadPp(value) { const parsed = numberOrNull(value); return parsed == null ? "n/a" : `${signed(parsed, 2)} pp`; }
 function quadArrow(value) { const parsed = numberOrNull(value); return parsed == null ? "·" : parsed > 0 ? "↑" : "↓"; }
@@ -309,9 +311,9 @@ function quadTableRowMarkup(row) {
   const probabilities = row.probabilities || null;
   const counts = row.scenario_counts || null;
   const grid = probabilities
-    ? `<span class="quad-grid">${[1, 2, 3, 4].map((quad) => `<i class="q${quad}" style="flex:${probabilities[quad] || 0}" title="${quadName(quad)}: ${Math.round((probabilities[quad] || 0) * 100)}%"></i>`).join("")}</span><small>${[1, 2, 3, 4].filter((quad) => (probabilities[quad] || 0) >= 0.05).map((quad) => `Q${quad} ${Math.round(probabilities[quad] * 100)}%`).join(" · ")}</small>`
+    ? `<span class="quad-grid">${[1, 2, 3, 4].map((quad) => `<i class="q${quad}" style="flex:${probabilities[quad] || 0}" title="${quadName(quad)}: ${Math.round((probabilities[quad] || 0) * 100)}%"></i>`).join("")}</span><small>${[1, 2, 3, 4].filter((quad) => (probabilities[quad] || 0) >= 0.05).map((quad) => `${quadName(quad)} ${Math.round(probabilities[quad] * 100)}%`).join(" · ")}</small>`
     : counts
-    ? `<span class="quad-grid">${[1, 2, 3, 4].map((quad) => `<i class="q${quad}" style="flex:${counts[quad] || 0}" title="${quadName(quad)}: ${counts[quad] || 0} of 9"></i>`).join("")}</span><small>${[1, 2, 3, 4].filter((quad) => counts[quad]).map((quad) => `Q${quad} ${counts[quad]}`).join(" · ")}</small>`
+    ? `<span class="quad-grid">${[1, 2, 3, 4].map((quad) => `<i class="q${quad}" style="flex:${counts[quad] || 0}" title="${quadName(quad)}: ${counts[quad] || 0} of 9"></i>`).join("")}</span><small>${[1, 2, 3, 4].filter((quad) => counts[quad]).map((quad) => `${quadName(quad)} ${counts[quad]}`).join(" · ")}</small>`
     : `<small>realized</small>`;
   const growthRange = row.growth_yoy_range ? `<small>${quadPct(row.growth_yoy_range[0], 1)} – ${quadPct(row.growth_yoy_range[1], 1)}</small>` : "";
   const inflationRange = row.inflation_yoy_range ? `<small>${quadPct(row.inflation_yoy_range[0], 1)} – ${quadPct(row.inflation_yoy_range[1], 1)}</small>` : "";
@@ -342,10 +344,10 @@ function quadMapMarkup(rows) {
   const dashed = points.slice(Math.max(0, lastRealizedIndex));
   const line = (list) => list.map((row, index) => `${index ? "L" : "M"}${x(row).toFixed(1)},${y(row).toFixed(1)}`).join(" ");
   const labels = [
-    { text: "QUAD 3", sub: "growth ↓ inflation ↑", x: pad + 6, y: pad + 12, anchor: "start" },
-    { text: "QUAD 2", sub: "growth ↑ inflation ↑", x: size - pad - 6, y: pad + 12, anchor: "end" },
-    { text: "QUAD 4", sub: "growth ↓ inflation ↓", x: pad + 6, y: size - pad - 16, anchor: "start" },
-    { text: "QUAD 1", sub: "growth ↑ inflation ↓", x: size - pad - 6, y: size - pad - 16, anchor: "end" },
+    { text: "STAGFLATION", sub: "growth ↓ inflation ↑", x: pad + 6, y: pad + 12, anchor: "start" },
+    { text: "REFLATION", sub: "growth ↑ inflation ↑", x: size - pad - 6, y: pad + 12, anchor: "end" },
+    { text: "DEFLATION", sub: "growth ↓ inflation ↓", x: pad + 6, y: size - pad - 16, anchor: "start" },
+    { text: "GOLDILOCKS", sub: "growth ↑ inflation ↓", x: size - pad - 6, y: size - pad - 16, anchor: "end" },
   ];
   return `<svg class="quad-map" viewBox="0 0 ${size} ${size}" role="img" aria-label="Quarterly path through the four quads">
     <rect class="qbg q3" x="${pad}" y="${pad}" width="${mid - pad}" height="${mid - pad}"></rect>
@@ -485,6 +487,90 @@ function trendLabel(score) {
   return { label: "Flat", tone: "neutral" };
 }
 
+const QUARTER_TEXT = (label) => String(label || "").replace(/^(\d{4})Q(\d)$/, "Q$2 $1");
+
+function renderOutlook() {
+  const container = document.getElementById("outlook");
+  const outlook = state.outlook;
+  if (!outlook?.headline) {
+    container.hidden = true;
+    return;
+  }
+  container.hidden = false;
+  const now = (outlook.now || []).map((item) => `<div class="outlook-fact"><dt>${escapeHtml(item.label)}</dt><dd>${escapeHtml(item.text)}</dd></div>`).join("");
+  const ahead = (outlook.ahead || []).map((item) => {
+    const probability = numberOrNull(item.probability);
+    const hit = numberOrNull(item.historical_hit_rate);
+    return `<li class="outlook-quarter">
+      <b>${escapeHtml(QUARTER_TEXT(item.quarter))}</b>
+      ${quadBadge(item.quad)}
+      <span class="outlook-quarter-text">${escapeHtml(item.description)}</span>
+      <span class="outlook-probability"><i style="width:${probability == null ? 0 : Math.round(probability * 100)}%"></i><em>${probability == null ? "n/a" : `${Math.round(probability * 100)}%`}</em></span>
+      <small>${escapeHtml(item.conviction)} conviction${hit == null ? "" : ` · right ${Math.round(hit * 100)}% of the time at this horizon`}</small>
+    </li>`;
+  }).join("");
+  const releases = (outlook.releases || []).map(outlookReleaseMarkup).join("");
+  container.innerHTML = `<header>
+      <span class="eyebrow">OUTLOOK · ${escapeHtml(formatDate(outlook.as_of_date))}</span>
+      <h2>${escapeHtml(outlook.headline)}</h2>
+    </header>
+    <div class="outlook-grid">
+      <article><h3>Where we are</h3><dl class="outlook-facts">${now}</dl></article>
+      <article><h3>Where the regime model points</h3><ol class="outlook-quarters">${ahead}</ol></article>
+    </div>
+    <div class="outlook-releases">
+      <h3>Coming up · our forecast and what it would change</h3>
+      <p class="range-legend"><i class="r50"></i>half of past releases landed here <i class="r80"></i>four in five <b class="point"></b>our forecast <b class="prior"></b>last print</p>
+      ${releases || `<p class="outlook-empty">No scheduled releases found.</p>`}
+    </div>
+    <ul class="outlook-notes">${(outlook.notes || []).map((note) => `<li>${escapeHtml(note)}</li>`).join("")}</ul>`;
+}
+
+function outlookReleaseMarkup(release) {
+  const date = new Date(`${release.date}T00:00:00Z`);
+  const day = new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" }).format(date);
+  const forecasts = (release.forecasts || []).map(outlookForecastMarkup).join("");
+  const meaning = (release.meaning || []).map((line) => `<li>${escapeHtml(line)}</li>`).join("");
+  return `<article class="outlook-release">
+    <div class="outlook-release-date">${release.date_is_estimate ? "≈ " : ""}${escapeHtml(day)}</div>
+    <div class="outlook-release-name"><strong>${escapeHtml(release.label)}</strong>${release.reference ? `<span>${escapeHtml(release.reference)}</span>` : ""}</div>
+    <div class="outlook-release-forecasts">${forecasts || `<span class="outlook-none">No forecast model</span>`}</div>
+    <ul class="outlook-release-meaning">${meaning}</ul>
+  </article>`;
+}
+
+function outlookForecastMarkup(row) {
+  const percent = row.unit === "percent";
+  const format = (value) => {
+    const parsed = numberOrNull(value);
+    if (parsed == null) return "n/a";
+    return percent ? `${signed(parsed, 2)}%` : `${signed(Math.round(parsed), 0)}k`;
+  };
+  const r50 = row.range_50 || null;
+  const r80 = row.range_80 || null;
+  const points = [row.forecast, row.prior, ...(r80 || [])].map(numberOrNull).filter((value) => value != null);
+  let bar = "";
+  if (r50 && r80 && points.length) {
+    const low = Math.min(...points);
+    const high = Math.max(...points);
+    const pad = (high - low) * 0.08 || 1;
+    const position = (value) => (100 * (Number(value) - (low - pad))) / (high - low + 2 * pad);
+    const zero = low < 0 && high > 0 ? `<b class="zero" style="left:${position(0)}%"></b>` : "";
+    bar = `<div class="range-bar" role="img" aria-label="50% range ${format(r50[0])} to ${format(r50[1])}, 80% range ${format(r80[0])} to ${format(r80[1])}">
+      <i class="r80" style="left:${position(r80[0])}%;width:${position(r80[1]) - position(r80[0])}%"></i>
+      <i class="r50" style="left:${position(r50[0])}%;width:${position(r50[1]) - position(r50[0])}%"></i>
+      ${zero}
+      ${numberOrNull(row.prior) == null ? "" : `<b class="prior" style="left:${position(row.prior)}%" title="Last print ${format(row.prior)}"></b>`}
+      <b class="point" style="left:${position(row.forecast)}%"></b>
+    </div>`;
+  }
+  return `<div class="outlook-forecast">
+    <div class="outlook-forecast-head"><span>${escapeHtml(row.label)}</span><strong>${format(row.forecast)}</strong>${row.validated ? `<em class="validated">validated</em>` : `<em>preview</em>`}</div>
+    ${bar}
+    <small>${r50 ? `50%: ${format(r50[0])} to ${format(r50[1])} · 80%: ${format(r80[0])} to ${format(r80[1])} · ` : ""}last ${format(row.prior)}</small>
+  </div>`;
+}
+
 function renderDecision() {
   const container = document.getElementById("decision-panel");
   const overlay = state.riskOverlay;
@@ -519,15 +605,6 @@ function renderDecision() {
     ? `S&P implied vol ${premiumNumber(spx.options.ivx)} vs ${premiumNumber(spx.options.forward_rv_forecast)} expected realized (${premiumSigned(spx.options.forward_iv_edge)} pts), IV rank ${ivRankText(spx.options.iv_rank)}.`
     : "S&P option data unavailable.";
 
-  const forecasts = state.releases?.forecasts || [];
-  const validated = forecasts.filter((row) => row.validated);
-  const previews = forecasts.filter((row) => !row.validated && !(row.target_id === "payroll_change" && row.variant_id !== "core"));
-  const validatedMarkup = validated.length
-    ? validated.map((row) => `<p><strong>${escapeHtml(row.target_label)} (${escapeHtml(row.reference_month)}): ${releaseValue(row, row.forecast)}</strong> vs ${releaseValue(row, row.baseline_forecast)} naive baseline; last print ${releaseValue(row, row.prior)}.${row.model_mae != null ? ` Typical miss ${row.model_mae.toFixed(2)} vs ${row.baseline_mae.toFixed(2)} for the baseline.` : ""}</p>`).join("")
-    : `<p>No release forecast currently passes validation.</p>`;
-  const previewMarkup = previews.length ? `<small>Unvalidated previews: ${previews.map((row) => `${escapeHtml(row.target_label)} ${releaseValue(row, row.forecast)}`).join(" · ")}</small>` : "";
-  const upcoming = nextReleasesMarkup();
-
   container.innerHTML = `<header><div><span class="eyebrow">WHAT TO DO NOW · VALIDATED SIGNALS ONLY</span><h2 class="decision-headline ${action.tone}">${escapeHtml(action.action)}</h2></div>
       <p>Everything below the line is context. The quad, monitor percentiles, and option strategy leans are not trading signals.</p></header>
     <div class="decision-grid">
@@ -540,30 +617,13 @@ function renderDecision() {
       <article class="decision-card"><span>Option pricing</span>
         <p>${escapeHtml(volLine)} ${rich} of ${options.length} optionable assets price implied vol more than 2 points above expected realized.</p>
         <small>Observed prices. Rich implied vol favors premium sellers on average; the per-asset strategy leans are untested.</small></article>
-      <article class="decision-card"><span>Next data</span>
-        ${validatedMarkup}${previewMarkup}${upcoming}</article>
     </div>`;
-}
-
-function releaseValue(row, value) {
-  const parsed = numberOrNull(value);
-  if (parsed == null) return "n/a";
-  return row.unit === "percent" ? `${parsed.toFixed(2)}%` : `${Math.round(parsed)}k`;
 }
 
 function ivRankText(value) {
   const parsed = numberOrNull(value);
   if (parsed == null) return "n/a";
   return parsed > 100 ? "100+ (above its 1-year range)" : parsed.toFixed(0);
-}
-
-function nextReleasesMarkup() {
-  const wanted = ["payroll_growth", "core_cpi_inflation", "core_pce_inflation", "real_gdp_growth", "industrial_production"];
-  const rows = state.rows.filter((row) => wanted.includes(row.indicator_id) && row.expected_next_release)
-    .map((row) => ({ label: row.label, date: new Date(row.expected_next_release), estimate: row.expected_next_release_is_estimate }))
-    .sort((a, b) => a.date - b.date);
-  if (!rows.length) return "";
-  return `<small class="release-dates">Next releases: ${rows.map((row) => `${escapeHtml(row.label)} ${escapeHtml(formatDate(row.date))}${row.estimate ? "*" : ""}`).join(" · ")}${rows.some((row) => row.estimate) ? " (*estimated)" : ""}</small>`;
 }
 
 function renderFilters() {

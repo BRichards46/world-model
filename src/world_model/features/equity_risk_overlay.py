@@ -101,8 +101,71 @@ def compute_equity_risk_overlay(
             _input("manufacturing_hours", "Manufacturing hours", hours_gap, "hours vs 12m avg", hours_warning, "below average", _date(hours), role="early warning"),
             _input("real_durable_orders", "Real durable orders", orders_growth, "% YoY", orders_warning, "contracting", _date(real_orders), role="confirmation"),
         ],
+        "triggers": {
+            "market_trend": market_trigger(monthly, window, as_of_date),
+            "unemployment_trend": unemployment_trigger(unemployment, unemployment_buffer),
+            "industrial_production": industrial_production_trigger(_series(series_by_id, "INDPRO", as_of_date)),
+        },
         "source_note": "Norgate $SPX price returns are used before $SPXTR total-return history becomes available; total returns are used thereafter.",
         "data_warnings": data_warnings,
+    }
+
+
+def market_trigger(monthly: pd.Series, window: int, as_of: pd.Timestamp) -> dict[str, Any] | None:
+    """Month-end level, relative to the latest close, at which the index would fall below its moving average.
+
+    The month-end close is part of its own average, so with the other ``window - 1`` month-ends summing to S
+    the close X breaks the trend when X < (S + X) / window, that is X < S / (window - 1).
+    """
+    values = monthly.dropna()
+    if len(values) < window:
+        return None
+    latest_period = pd.Timestamp(values.index[-1]).to_period("M")
+    in_progress = latest_period == as_of.to_period("M")
+    others = values.iloc[-window:-1] if in_progress else values.iloc[-(window - 1):]
+    threshold = float(others.mean())
+    latest = float(values.iloc[-1])
+    month = latest_period if in_progress else latest_period + 1
+    return {
+        "month": str(month),
+        "threshold_change_pct": 100.0 * (threshold / latest - 1.0),
+    }
+
+
+def unemployment_trigger(unemployment: pd.Series, buffer: float) -> dict[str, Any] | None:
+    """Unemployment rate the next month must exceed for the gap over its 12-month average to pass ``buffer``.
+
+    With the other n published months of the window summing to S, the next reading X warns when
+    X - (S + X) / (n + 1) > buffer, that is X > (buffer * (n + 1) + S) / n.
+    """
+    values = pd.to_numeric(unemployment, errors="coerce").dropna().sort_index()
+    if values.empty:
+        return None
+    next_month = (pd.Timestamp(values.index[-1]) + pd.DateOffset(months=1)).normalize()
+    others = values[values.index > next_month - pd.DateOffset(months=12)]
+    if len(others) < 10:
+        return None
+    count = len(others)
+    threshold = (buffer * (count + 1) + float(others.sum())) / count
+    return {
+        "month": next_month.strftime("%Y-%m"),
+        "threshold_rate": threshold,
+        "latest_rate": float(values.iloc[-1]),
+    }
+
+
+def industrial_production_trigger(industrial_production: pd.Series) -> dict[str, Any] | None:
+    """Monthly change in industrial production that would take its YoY growth to zero next month."""
+    values = pd.to_numeric(industrial_production, errors="coerce").dropna().sort_index()
+    if values.empty:
+        return None
+    next_month = (pd.Timestamp(values.index[-1]) + pd.DateOffset(months=1)).normalize()
+    base_key = next_month - pd.DateOffset(months=12)
+    if base_key not in values.index:
+        return None
+    return {
+        "month": next_month.strftime("%Y-%m"),
+        "threshold_change_pct": 100.0 * (float(values.loc[base_key]) / float(values.iloc[-1]) - 1.0),
     }
 
 

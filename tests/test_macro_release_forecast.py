@@ -114,3 +114,46 @@ def test_site_payload_marks_only_validated_rows_and_keeps_display_units() -> Non
     assert pce["validated"] is True and pce["model_mae"] == 0.076 and pce["reference_month"] == "2026-10"
     # MAE is in model units (bp of employment), so it is withheld from the thousand-jobs display.
     assert payroll["validated"] is False and payroll["model_mae"] is None
+
+
+def test_ranges_use_recent_misses_in_display_units() -> None:
+    from world_model.states.macro_release_forecast import MacroReleaseForecastResult, build_release_site_payload, forecast_ranges
+
+    releases = pd.date_range("2020-01-15", periods=40, freq="MS")
+    errors = [(-1.0 if index % 2 else 1.0) * (index % 5) for index in range(40)]
+    forecasts = pd.DataFrame(
+        {
+            "target_id": "payroll_change",
+            "variant_id": "core",
+            "release_date": releases,
+            "forecast": 5.0,
+            "actual": [5.0 + error for error in errors],
+        }
+    )
+    ranges = forecast_ranges(forecasts, "payroll_change", "core", window=30, minimum=24)
+    recent = pd.Series(errors[-30:])
+    assert ranges["observations"] == 30 and ranges["since"] == f"{releases[10]:%Y-%m}"
+    assert ranges["error_80"] == [recent.quantile(0.1), recent.quantile(0.9)]
+    assert forecast_ranges(forecasts, "payroll_change", "core", window=30, minimum=31) is None
+
+    current = pd.DataFrame(
+        {
+            "as_of_date": [pd.Timestamp("2026-11-09")],
+            "target_id": ["payroll_change"],
+            "target_label": ["Nonfarm payroll change"],
+            "variant_id": ["core"],
+            "forecast_observation_date": [pd.Timestamp("2026-11-01")],
+            "display_forecast": [160.0],
+            "display_baseline_forecast": [150.0],
+            "display_prior_target": [140.0],
+            "display_scale": [16.0],  # thousand jobs per basis point of employment
+            "unit": ["basis points of payroll employment"],
+            "display_unit": ["thousand jobs"],
+            "research_candidate": [False],
+        }
+    )
+    empty = pd.DataFrame()
+    row = build_release_site_payload(MacroReleaseForecastResult(empty, forecasts, empty, current, empty))["forecasts"][0]
+    full = pd.Series(errors[-40:])
+    assert row["range_80"] == [160.0 + 16.0 * full.quantile(0.1), 160.0 + 16.0 * full.quantile(0.9)]
+    assert row["range_80"][0] < row["range_50"][0] <= row["range_50"][1] < row["range_80"][1]

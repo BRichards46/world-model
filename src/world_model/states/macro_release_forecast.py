@@ -85,6 +85,7 @@ def run_macro_release_forecast(
                     "display_baseline_forecast": _display_forecast(baseline, latest_target, target),
                     "display_prior_target": _display_forecast(prior_target, latest_target, target),
                     "display_unit": str(target.get("display_unit", target.get("unit", ""))),
+                    "display_scale": _display_forecast(1.0, latest_target, target),
                     "feature_coverage": current_coverage,
                     "train_observations": len(usable),
                 }
@@ -168,6 +169,39 @@ def summarize_macro_release_forecasts(
     ).reset_index(drop=True)
 
 
+RANGE_WINDOW = 60
+RANGE_MINIMUM = 24
+
+
+def forecast_ranges(
+    forecasts: pd.DataFrame,
+    target_id: str,
+    variant_id: str,
+    window: int = RANGE_WINDOW,
+    minimum: int = RANGE_MINIMUM,
+) -> dict[str, Any] | None:
+    """Empirical 50% and 80% error bands from the most recent walk-forward misses (actual minus forecast).
+
+    Every walk-forward forecast used only vintages published before its release, so the misses are honest
+    out-of-sample errors. The recent window keeps a persistent bias (for example payrolls coming in below the
+    model) inside the band instead of averaging it away.
+    """
+    if forecasts.empty:
+        return None
+    rows = forecasts[(forecasts["target_id"] == target_id) & (forecasts["variant_id"] == variant_id)]
+    rows = rows.dropna(subset=["actual", "forecast"]).sort_values("release_date").tail(window)
+    if len(rows) < minimum:
+        return None
+    errors = rows["actual"] - rows["forecast"]
+    quantiles = errors.quantile([0.10, 0.25, 0.75, 0.90])
+    return {
+        "error_50": [float(quantiles.loc[0.25]), float(quantiles.loc[0.75])],
+        "error_80": [float(quantiles.loc[0.10]), float(quantiles.loc[0.90])],
+        "observations": int(len(rows)),
+        "since": f"{pd.Timestamp(rows['release_date'].iloc[0]):%Y-%m}",
+    }
+
+
 def build_release_site_payload(result: MacroReleaseForecastResult) -> dict[str, Any]:
     """Browser payload: current forecasts with their walk-forward record. Only validated rows count as signals."""
     summary = result.summary.set_index(["target_id", "variant_id"]) if not result.summary.empty else pd.DataFrame()
@@ -181,6 +215,9 @@ def build_release_site_payload(result: MacroReleaseForecastResult) -> dict[str, 
                 return None
             return float(record[name])
 
+        ranges = forecast_ranges(result.forecasts, row.target_id, row.variant_id)
+        scale = float(getattr(row, "display_scale", 1.0))
+        forecast = float(row.display_forecast)
         rows.append(
             {
                 "target_id": row.target_id,
@@ -196,6 +233,10 @@ def build_release_site_payload(result: MacroReleaseForecastResult) -> dict[str, 
                 "baseline_mae": stat("baseline_mae") if same_units else None,
                 "direction_hit_rate": stat("direction_hit_rate"),
                 "observations": int(record["observations"]) if record is not None and pd.notna(record["observations"]) else None,
+                "range_50": [forecast + scale * error for error in ranges["error_50"]] if ranges else None,
+                "range_80": [forecast + scale * error for error in ranges["error_80"]] if ranges else None,
+                "range_observations": ranges["observations"] if ranges else None,
+                "range_since": ranges["since"] if ranges else None,
             }
         )
     as_of = result.current["as_of_date"].iloc[0] if not result.current.empty else None
@@ -203,7 +244,9 @@ def build_release_site_payload(result: MacroReleaseForecastResult) -> dict[str, 
         "as_of_date": f"{pd.Timestamp(as_of):%Y-%m-%d}" if as_of is not None else None,
         "forecasts": rows,
         "note": "Validated = beats a prior-reading autoregression on mean absolute error in the full, early and late "
-        "walk-forward samples, with at least a 52% directional hit rate. Other rows are previews, not signals.",
+        "walk-forward samples, with at least a 52% directional hit rate. Other rows are previews, not signals. "
+        f"Ranges come from the last {RANGE_WINDOW} out-of-sample misses: half of past releases landed inside the "
+        "50% range and four in five inside the 80% range.",
     }
 
 

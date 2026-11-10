@@ -92,3 +92,27 @@ def test_norgate_index_reader_uses_catalog_dataset(tmp_path) -> None:
 
     assert series.name == "$SPX"
     assert series.tolist() == [10.0, 11.0, 12.0]
+
+
+def test_triggers_give_the_levels_that_would_flip_each_signal() -> None:
+    from world_model.features.equity_risk_overlay import (
+        industrial_production_trigger,
+        market_trigger,
+        unemployment_trigger,
+    )
+
+    months = pd.date_range("2025-01-01", periods=12, freq="MS")
+    unemployment = pd.Series([4.0] * 12, index=months)
+    trigger = unemployment_trigger(unemployment, 0.1)
+    assert trigger["month"] == "2026-01"
+    # 11 readings of 4.0 stay in the window: X - (44 + X) / 12 > 0.1  =>  X > 4.109...
+    assert abs(trigger["threshold_rate"] - (0.1 * 12 + 44.0) / 11) < 1e-12
+
+    production = pd.Series([100.0] * 11 + [104.0], index=months)
+    ip = industrial_production_trigger(production)
+    assert ip["month"] == "2026-01" and abs(ip["threshold_change_pct"] - (100.0 / 104.0 - 1.0) * 100.0) < 1e-9
+
+    # Ten month-ends; the last is the month in progress, so the other nine set the line.
+    closes = pd.Series([100.0] * 9 + [110.0], index=pd.date_range("2025-01-31", periods=10, freq="ME"))
+    market = market_trigger(closes, 10, pd.Timestamp("2025-10-15"))
+    assert market["month"] == "2025-10" and abs(market["threshold_change_pct"] - (100.0 / 110.0 - 1.0) * 100.0) < 1e-9

@@ -70,11 +70,23 @@ The state vector includes:
 - composite score
 - regime label
 
-The dashboard opens with a "What to do now" panel built only from validated
-signals: the equity risk overlay and its distance to triggering, 6–12 month
-trend on the main futures, option pricing (implied vs expected realized vol),
-and release forecasts that pass walk-forward validation (currently core PCE).
-Everything else on the page is labeled context.
+The dashboard opens with an outlook (`outlook.json`, built by
+`world_model.cli.macro_outlook` from the other payloads):
+
+- **Where we are:** the quad, the equity risk overlay and how far the S&P is
+  from breaking trend, growth, jobs and inflation.
+- **Where the quad model points:** this quarter and the next two, with
+  probability and the model's historical hit rate at each horizon.
+- **Coming up:** each scheduled release with our forecast, 50% and 80% ranges
+  from the model's last five years of out-of-sample misses, and what the print
+  would change. That includes the exact level that would trip an overlay
+  signal (for example the unemployment rate that crosses the 0.1 pp buffer)
+  and the monthly CPI pace each quarter needs for inflation to accelerate.
+
+Below it, a "What to do now" panel shows only validated signals: the equity
+risk overlay, 6–12 month trend on the main futures, and option pricing
+(implied vs expected realized vol). Everything else on the page is labeled
+context.
 
 The Trend tab shows the directional-momentum tape for the selected CSI futures
 and the 11 Select Sector SPDR ETFs: 1-, 3-, 6-, 10-, and 12-month

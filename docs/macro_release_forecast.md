@@ -27,6 +27,14 @@ on mean absolute error over the full, early, and late out-of-sample windows and
 meets the directional threshold. The shorter ADP variant is reported
 separately and requires at least 36 out-of-sample releases before promotion.
 
+Each forecast in `release_forecasts.json` carries 50% and 80% ranges. They are
+the 25th–75th and 10th–90th percentiles of the model's last 60 out-of-sample
+misses (actual minus forecast), added to the current forecast and converted to
+display units. A recent window keeps a persistent bias inside the range: for
+example, payrolls have recently come in below the model, so their range sits
+mostly below the point forecast. The dashboard's outlook shows these ranges for
+every upcoming release; only validated forecasts are labeled as such.
+
 The daily `run_macro.sh` workflow refreshes these artifacts. They remain
 research outputs; a forecast is not promoted to the dashboard merely because a
 single current estimate is available.
