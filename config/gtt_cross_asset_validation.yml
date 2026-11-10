@@ -1,0 +1,60 @@
+# GTT beyond the S&P 500. Each asset's macro logic is fixed here from economics before any results
+# are seen. "Danger" means the macro backdrop agrees with a falling price trend, so the strategy moves
+# to cash only when the trend is down AND the danger filter is on.
+# Point-in-time macro values come from the threshold study (FRED vintages, release by release).
+
+bootstrap_iterations: 500
+backtest_cost_bps: 5
+
+assets:
+  russell_2000:
+    label: Russell 2000 (Norgate $RUTTR total return)
+    source: {kind: norgate_index, symbol: $RUTTR}
+    start: "1980-01-01"
+    logic: equity
+  sp500_reference:
+    label: S&P 500 over the Russell window (reference)
+    source: {kind: benchmark}
+    start: "1980-01-01"
+    logic: equity
+  treasury_10y:
+    label: 10-year Treasury total return (built from the daily 10-year yield)
+    source: {kind: synthetic_treasury, yield_series: DGS10, maturity_years: 10}
+    start: "1972-09-01"
+    logic: bonds
+  zn_futures:
+    label: 10-year Treasury note futures (CSI ZN, back-adjusted)
+    source: {kind: csi, file: ZN__B.parquet}
+    start: "1996-09-01"
+    logic: bonds
+    excess_returns: true   # futures returns are already in excess of cash
+  dx_futures:
+    label: U.S. Dollar Index futures (CSI DX, back-adjusted)
+    source: {kind: csi, file: DX2_B.parquet}
+    start: "1995-10-01"
+    logic: dollar
+    excess_returns: true
+
+# Filters per logic. Building blocks:
+#   growth_weak       industrial production YoY <= 0 OR unemployment > 12m average + 0.1 pp (the overlay rule)
+#   growth_healthy    NOT growth_weak
+#   cpi_above_2_5     headline CPI YoY >= 2.5% (the legacy trigger level)
+#   cpi_above_4       headline CPI YoY >= 4%
+#   cpi_below_2_5     headline CPI YoY < 2.5%
+#   indpro_weak, unemployment_weak, indpro_or_real_retail_weak: single growth warnings
+logic_filters:
+  equity:            # recessions hurt stocks: a growth warning confirms a falling trend
+    - growth_weak
+    - indpro_weak
+    - unemployment_weak
+    - indpro_or_real_retail_weak
+  bonds:             # strong growth and inflation hurt bonds: those confirm a falling bond trend
+    - growth_healthy
+    - cpi_above_2_5
+    - cpi_above_4
+    - growth_healthy_and_cpi_above_2_5
+  dollar:            # no settled theory, so both directions are tested and judged together
+    - growth_weak
+    - growth_healthy
+    - cpi_below_2_5
+    - cpi_above_2_5
