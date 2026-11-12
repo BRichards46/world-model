@@ -118,8 +118,16 @@ def kalshi_expectations(ladders: pd.DataFrame, price_column: str = "price_at_clo
     return table.sort_values(["target_id", "reference_month"]).reset_index(drop=True)
 
 
-def our_forecasts(forecasts: pd.DataFrame, payroll_levels: pd.Series | None = None) -> pd.DataFrame:
-    """Our out-of-sample forecasts in display units (payrolls converted from basis points to thousands)."""
+def our_forecasts(
+    forecasts: pd.DataFrame,
+    payroll_levels: pd.Series | None = None,
+    headline_bottom_up: pd.DataFrame | None = None,
+) -> pd.DataFrame:
+    """Our out-of-sample forecasts in display units (payrolls converted from basis points to thousands).
+
+    With ``headline_bottom_up`` (the energy CPI backtest), headline CPI is scored on the bottom-up nowcast,
+    which is what the dashboard shows; the autoregressive benchmark stays the naive comparison.
+    """
     rows = []
     for target_id, variant in OUR_VARIANTS.items():
         part = forecasts[(forecasts["target_id"] == target_id) & (forecasts["variant_id"] == variant)].copy()
@@ -132,6 +140,11 @@ def our_forecasts(forecasts: pd.DataFrame, payroll_levels: pd.Series | None = No
             level = part["reference_month"].map(payroll_levels)
             for column in ("actual", "forecast", "baseline_forecast"):
                 part[column] = part[column] / 10000.0 * level
+        if target_id == "headline_cpi_mom" and headline_bottom_up is not None and not headline_bottom_up.empty:
+            bottom_up = headline_bottom_up.set_index("month")
+            part = part.set_index("reference_month", drop=False)
+            part["forecast"] = bottom_up["headline_forecast"].reindex(part.index).to_numpy()
+            part = part.dropna(subset=["forecast"]).reset_index(drop=True)
         rows.append(
             part.rename(columns={"forecast": "ours", "baseline_forecast": "naive"})[
                 ["target_id", "reference_month", "release_date", "actual", "ours", "naive"]

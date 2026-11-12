@@ -47,6 +47,9 @@ def build_macro_outlook(
     overlay = overlay or {}
     rows = {str(row.get("indicator_id")): row for row in snapshot}
     forecasts = {(row["target_id"], row["variant_id"]): row for row in (releases or {}).get("forecasts", [])}
+    if ("headline_cpi_mom", "bottom_up") in forecasts:
+        # The bottom-up nowcast replaces the single-equation headline model wherever the outlook reads it.
+        forecasts[("headline_cpi_mom", "pipeline")] = forecasts.pop(("headline_cpi_mom", "bottom_up"))
     forecasts = _with_outside_views(forecasts, benchmarks or {})
     quarters = list(quad.get("quarters", []))
     current_index = next((i for i, q in enumerate(quarters) if q.get("is_current_quarter")), None)
@@ -144,8 +147,8 @@ def build_macro_outlook(
         "notes": [
             "Regimes describe the growth and inflation backdrop; they are not trading signals. The equity risk "
             "overlay is the only validated signal here.",
-            "Forecast ranges come from the model's own out-of-sample misses over the last five years. Only "
-            "core PCE beats a naive forecast; the others are previews.",
+            "Forecast ranges come from the model's own out-of-sample misses over the last five years. "
+            + _validated_note(forecasts),
             "Market expectations are the median of Kalshi's prices on each range of the print. The market has been "
             "more accurate than our models and the Cleveland Fed nowcast on every release we score, so a surprise "
             "against the market is the real news.",
@@ -287,6 +290,15 @@ def _forecast_view(row: Mapping[str, Any], label: str) -> dict[str, Any]:
     }
 
 
+def _validated_note(forecasts: Mapping[tuple[str, str], Mapping[str, Any]]) -> str:
+    labels = {"headline_cpi_mom": "headline CPI", "core_cpi_mom": "core CPI", "core_pce_mom": "core PCE", "payroll_change": "payrolls"}
+    validated = [labels.get(key[0], key[0]) for key, row in forecasts.items() if row.get("validated")]
+    if not validated:
+        return "None of the release forecasts beats a naive forecast yet; all are previews."
+    names = " and ".join(validated) if len(validated) <= 2 else ", ".join(validated[:-1]) + " and " + validated[-1]
+    return f"Only {names} beat{'s' if len(validated) == 1 else ''} a naive forecast; the others are previews."
+
+
 def _with_outside_views(
     forecasts: Mapping[tuple[str, str], Mapping[str, Any]], benchmarks: Mapping[str, Any]
 ) -> dict[tuple[str, str], dict[str, Any]]:
@@ -350,13 +362,14 @@ def _meaning(
             )
             ours = _number(headline.get("forecast"))
             if market is not None and ours is not None and abs(ours - market) >= 0.1:
-                lines.append(
-                    f"Our model ({ours:+.2f}%) is well above the market ({market:+.2f}%). The market has been the more "
-                    "accurate on headline CPI; our model has no energy-price input."
-                    if ours > market
-                    else f"Our model ({ours:+.2f}%) is well below the market ({market:+.2f}%). The market has been the "
-                    "more accurate on headline CPI; our model has no energy-price input."
+                record = (headline.get("track_record") or {}).get("mae", {})
+                misses = (
+                    f" On headline CPI the market has missed by {record['kalshi']:.2f} pp on average, our model by "
+                    f"{record['ours']:.2f}."
+                    if record.get("kalshi") is not None and record.get("ours") is not None
+                    else " The market has been the more accurate on headline CPI."
                 )
+                lines.append(f"Our model ({ours:+.2f}%) is well {'above' if ours > market else 'below'} the market ({market:+.2f}%).{misses}")
         hurdle = _number(current.get("inflation_hurdle_mom")) if current else None
         if hurdle is not None and hurdle < 0:
             lines.append(
@@ -410,7 +423,7 @@ def _meaning(
     elif release_id == "pce":
         row = forecasts.get(("core_pce_mom", "pipeline"))
         if row and row.get("validated"):
-            lines.append("The one release forecast that beats a naive model in every test period.")
+            lines.append("Beats a naive model in every test period.")
         lines.append("The Fed's preferred inflation gauge. Context only: not a regime or risk-overlay input.")
 
     elif release_id == "industrial_production":

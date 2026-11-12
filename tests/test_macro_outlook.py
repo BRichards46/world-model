@@ -161,3 +161,16 @@ def test_outlook_without_benchmarks_keeps_our_forecast_wording() -> None:
     cpi = next(r for r in outlook["releases"] if r["id"] == "cpi")
     assert cpi["forecasts"][0]["market"] is None
     assert "our forecast would move it" in cpi["meaning"][0]
+
+
+def test_outlook_uses_the_bottom_up_headline_when_present() -> None:
+    releases = _releases()
+    releases["forecasts"].append(
+        {"target_id": "headline_cpi_mom", "variant_id": "bottom_up", "reference_month": "2026-11", "forecast": 0.14,
+         "range_50": [0.08, 0.22], "range_80": [0.01, 0.33], "unit": "percent", "validated": True}
+    )
+    outlook = build_macro_outlook(_quad(), _overlay(), releases, _snapshot(), None, _benchmarks())
+    cpi = next(r for r in outlook["releases"] if r["id"] == "cpi")
+    assert cpi["forecasts"][0]["forecast"] == 0.14 and cpi["forecasts"][0]["validated"]
+    assert any("market has missed by 0.09 pp on average, our model by 0.21" in line for line in cpi["meaning"])
+    assert "Only headline CPI beats a naive forecast" in " ".join(outlook["notes"])
