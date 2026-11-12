@@ -80,6 +80,52 @@ miss is in volatile blocks with no driver in our data.
   is negligible at airfares' 1% weight.
 - **Splitting transportation services** into insurance, maintenance and
   airfares: each part is noisier than the whole.
+- **Car insurance momentum** (tested 2026-11-12): see below.
+
+### Car insurance and airfares (market sample, June 2022 – October 2026)
+
+**Car insurance.** We rebuilt adjusted car insurance CPI point-in-time: the
+unadjusted index (`CUUR0000SETE`, with its release dates) divided by each
+year's projected seasonal factor from the BLS factor files, dated from the
+factors' publication. For 2026 it matches BLS's adjusted series exactly. Earlier
+years use the projected factors, not the later revisions. The series starts in
+2012.
+
+Its monthly changes carry on a little (autocorrelation 0.3), and recent
+averages beat the 12-month average:
+
+| Insurance forecast | Average miss (pp) |
+|---|---:|
+| Last 3 months | 0.56 |
+| Last 6 months | 0.57 |
+| Fitted autoregression | 0.60 |
+| Last 12 months | 0.63 |
+| Last month | 0.67 |
+
+Insurance is only about 3.4% of core, so this barely moves core:
+
+| Core CPI miss (50 releases) | |
+|---|---:|
+| This model | 0.089 |
+| With insurance from 6-month momentum | 0.091 |
+| With insurance known exactly | 0.086 |
+| Kalshi | 0.078 |
+
+Even a perfect insurance forecast closes only about a quarter of the gap to the
+market, so insurance isn't modelled separately.
+
+**Airfares.** About half the transportation services miss comes from airfares
+(about 1.1% of core). Knowing them exactly would bring core to 0.078, level with
+the market. Nothing we have predicts them:
+- **Jet fuel:** trims the airfare miss only from 2.83 to 2.77.
+- **Airline producer prices** (`PCU481111481111`): correlation with the airfare
+  CPI is 0.28 in the same month and 0.15 the month before. The PPI also came out
+  before CPI for only 10 of 65 releases since mid-2022.
+
+The market's edge on core is spread across noisy blocks (airfares, lodging,
+apparel, other goods), not concentrated in one that a single dataset would fix.
+On the market sample, knowing used cars exactly doesn't help at all (0.087 to
+0.088). The used-car gain in the full sample comes from 2020–22.
 
 ## On the dashboard
 
@@ -94,9 +140,14 @@ Fed.
 ## Next refinements
 
 These need data we don't have yet:
+- **Airfares:** the largest single lever since 2022, but airfare data such as
+  TSA passenger counts or fare indexes is untested, and the airfare CPI itself is
+  very noisy.
 - **Used cars:** the Manheim used-vehicle value index leads the CPI by about two
-  months.
-- **Transportation services:** car insurance rate filings and airfare data.
+  months. It's widely watched, and since 2022 even a perfect used-car forecast
+  wouldn't have improved core.
+- **Car insurance:** state rate filings. A perfect insurance forecast is worth
+  only 0.003 on core since 2022.
 - **Shelter turns:** the BLS new-tenant rent index, or Zillow/Apartment List
   asking rents.
 - **Lodging:** hotel rates (STR).
