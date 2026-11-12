@@ -40,12 +40,14 @@ def build_macro_outlook(
     releases: Mapping[str, Any] | None,
     snapshot: Iterable[Mapping[str, Any]],
     risk_context: Mapping[str, Any] | None = None,
+    benchmarks: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     quad = quad or {}
     risk_context = risk_context or {}
     overlay = overlay or {}
     rows = {str(row.get("indicator_id")): row for row in snapshot}
     forecasts = {(row["target_id"], row["variant_id"]): row for row in (releases or {}).get("forecasts", [])}
+    forecasts = _with_outside_views(forecasts, benchmarks or {})
     quarters = list(quad.get("quarters", []))
     current_index = next((i for i, q in enumerate(quarters) if q.get("is_current_quarter")), None)
     realized = [q for q in quarters if q.get("status") == "realized"]
@@ -144,6 +146,9 @@ def build_macro_outlook(
             "overlay is the only validated signal here.",
             "Forecast ranges come from the model's own out-of-sample misses over the last five years. Only "
             "core PCE beats a naive forecast; the others are previews.",
+            "Market expectations are the median of Kalshi's prices on each range of the print. The market has been "
+            "more accurate than our models and the Cleveland Fed nowcast on every release we score, so a surprise "
+            "against the market is the real news.",
             "Release dates marked ≈ are estimated from the last release and can be off by a few days.",
         ],
     }
@@ -274,7 +279,33 @@ def _forecast_view(row: Mapping[str, Any], label: str) -> dict[str, Any]:
         "range_80": row.get("range_80"),
         "prior": row.get("prior"),
         "validated": bool(row.get("validated")),
+        "market": row.get("market"),
+        "market_range_80": row.get("market_range_80"),
+        "market_range_open": row.get("market_range_open"),
+        "cleveland": row.get("cleveland"),
+        "track_record": row.get("track_record"),
     }
+
+
+def _with_outside_views(
+    forecasts: Mapping[tuple[str, str], Mapping[str, Any]], benchmarks: Mapping[str, Any]
+) -> dict[tuple[str, str], dict[str, Any]]:
+    """Attach the market (Kalshi) and Cleveland Fed expectations for the same month, plus each source's record."""
+    upcoming = {(item["target_id"], item["reference_month"]): item for item in benchmarks.get("upcoming", [])}
+    track = benchmarks.get("track_record", {})
+    merged = {}
+    for key, row in forecasts.items():
+        row = dict(row)
+        outside = upcoming.get((key[0], row.get("reference_month")), {})
+        row["market"] = outside.get("kalshi")
+        row["market_range_80"] = outside.get("kalshi_range_80")
+        row["market_range_open"] = outside.get("kalshi_range_open")
+        row["cleveland"] = outside.get("cleveland")
+        record = track.get(key[0])
+        if record and record.get("mae"):
+            row["track_record"] = {"releases": record.get("releases"), "start": record.get("start"), "mae": record["mae"]}
+        merged[key] = row
+    return merged
 
 
 def _reference(release_id: str, row: Mapping[str, Any], shown: list[dict[str, Any]]) -> str | None:
@@ -309,12 +340,23 @@ def _meaning(
         month = headline.get("reference_month") if headline else None
         comp = next((c for c in quad.get("cpi_comps", []) if c.get("month") == month), None)
         if headline and comp:
-            change = float(headline["forecast"]) - float(comp["comp_mom"])
+            market = _number(headline.get("market"))
+            expected, source = (market, "the market's expectation") if market is not None else (float(headline["forecast"]), "our forecast")
+            change = expected - float(comp["comp_mom"])
             lines.append(
                 f"A year ago this month CPI rose {float(comp['comp_mom']):.2f}%"
                 f"{' (estimated: that month was never published)' if comp.get('comp_interpolated') else ''}, "
-                f"so any print above that lifts headline inflation YoY; our forecast adds about {change:+.1f} pp."
+                f"so any print above that lifts headline inflation YoY; {source} would move it about {change:+.1f} pp."
             )
+            ours = _number(headline.get("forecast"))
+            if market is not None and ours is not None and abs(ours - market) >= 0.1:
+                lines.append(
+                    f"Our model ({ours:+.2f}%) is well above the market ({market:+.2f}%). The market has been the more "
+                    "accurate on headline CPI; our model has no energy-price input."
+                    if ours > market
+                    else f"Our model ({ours:+.2f}%) is well below the market ({market:+.2f}%). The market has been the "
+                    "more accurate on headline CPI; our model has no energy-price input."
+                )
         hurdle = _number(current.get("inflation_hurdle_mom")) if current else None
         if hurdle is not None and hurdle < 0:
             lines.append(
@@ -352,6 +394,12 @@ def _meaning(
             lines.append(line)
             lines.append("That alone is a watch, not risk-off: the S&P must also close a month below its 10-month average.")
         payroll = forecasts.get(("payroll_change", "core"))
+        market = _number(payroll.get("market")) if payroll else None
+        if payroll and market is not None and abs(float(payroll["forecast"]) - market) >= 50.0:
+            lines.append(
+                f"The market expects about {market:+.0f}k against our {float(payroll['forecast']):+.0f}k. Our payroll "
+                "forecasts have run high and the market has been the more accurate."
+            )
         if payroll and payroll.get("range_80"):
             low, high = payroll["range_80"]
             if high < 0:

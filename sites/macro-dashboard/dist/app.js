@@ -544,8 +544,8 @@ function renderOutlook() {
       <article><h3>Where the regime model points</h3><ol class="outlook-quarters">${ahead}</ol></article>
     </div>
     <div class="outlook-releases">
-      <h3>Coming up · our forecast and what it would change</h3>
-      <p class="range-legend"><i class="r50"></i>half of past releases landed here <i class="r80"></i>four in five <b class="point"></b>our forecast <b class="prior"></b>last print</p>
+      <h3>Coming up · what the market expects, our forecast, and what it would change</h3>
+      <p class="range-legend"><i class="r50"></i>our 50% range <i class="r80"></i>our 80% <b class="point"></b>our forecast <i class="m80"></i>market 80% <b class="market"></b>market <b class="prior"></b>last print</p>
       ${releases || `<p class="outlook-empty">No scheduled releases found.</p>`}
     </div>
     <ul class="outlook-notes">${(outlook.notes || []).map((note) => `<li>${escapeHtml(note)}</li>`).join("")}</ul>`;
@@ -573,7 +573,10 @@ function outlookForecastMarkup(row) {
   };
   const r50 = row.range_50 || null;
   const r80 = row.range_80 || null;
-  const points = [row.forecast, row.prior, ...(r80 || [])].map(numberOrNull).filter((value) => value != null);
+  const market = numberOrNull(row.market);
+  const m80 = row.market_range_80 || null;
+  const open = row.market_range_open || [false, false];
+  const points = [row.forecast, row.prior, market, ...(r80 || []), ...(m80 || [])].map(numberOrNull).filter((value) => value != null);
   let bar = "";
   if (r50 && r80 && points.length) {
     const low = Math.min(...points);
@@ -586,13 +589,30 @@ function outlookForecastMarkup(row) {
       <i class="r50" style="left:${position(r50[0])}%;width:${position(r50[1]) - position(r50[0])}%"></i>
       ${zero}
       ${numberOrNull(row.prior) == null ? "" : `<b class="prior" style="left:${position(row.prior)}%" title="Last print ${format(row.prior)}"></b>`}
+      ${m80 ? `<i class="m80" style="left:${position(m80[0])}%;width:${position(m80[1]) - position(m80[0])}%"></i>` : ""}
+      ${market == null ? "" : `<b class="market" style="left:${position(market)}%" title="Market ${format(market)}"></b>`}
       <b class="point" style="left:${position(row.forecast)}%"></b>
     </div>`;
   }
+  const marketText = market == null
+    ? ""
+    : `<div class="outlook-forecast-market"><span>Market</span><strong>${format(market)}</strong>${m80 ? `<small>80%: ${format(m80[0])}${open[0] ? " or less" : ""} to ${format(m80[1])}${open[1] ? " or more" : ""}</small>` : ""}${numberOrNull(row.cleveland) == null ? "" : `<span class="nowrap"><span>Cleveland Fed</span> <strong class="cleveland">${format(row.cleveland)}</strong></span>`}</div>`;
+  const record = row.track_record?.mae;
+  const miss = (value) => (value == null ? null : percent ? value.toFixed(2) : `${Math.round(value)}k`);
+  const recordText = record
+    ? `<small class="outlook-record">Average miss over ${row.track_record.releases} releases since ${escapeHtml(row.track_record.start || "")}: ${[
+        ["market", record.kalshi],
+        ["Cleveland Fed", record.cleveland],
+        ["ours", record.ours],
+        ["naive", record.naive],
+      ].filter(([, value]) => value != null).map(([name, value]) => `${name} ${miss(value)}`).join(" · ")}</small>`
+    : "";
   return `<div class="outlook-forecast">
-    <div class="outlook-forecast-head"><span>${escapeHtml(row.label)}</span><strong>${format(row.forecast)}</strong>${row.validated ? `<em class="validated">validated</em>` : `<em>preview</em>`}</div>
+    <div class="outlook-forecast-head"><span>${escapeHtml(row.label)}</span>${market == null ? "" : "<span>· ours</span>"}<strong>${format(row.forecast)}</strong>${row.validated ? `<em class="validated">validated</em>` : `<em>preview</em>`}</div>
+    ${marketText}
     ${bar}
-    <small>${r50 ? `50%: ${format(r50[0])} to ${format(r50[1])} · 80%: ${format(r80[0])} to ${format(r80[1])} · ` : ""}last ${format(row.prior)}</small>
+    <small>${r50 ? `Ours 50%: ${format(r50[0])} to ${format(r50[1])} · 80%: ${format(r80[0])} to ${format(r80[1])} · ` : ""}last ${format(row.prior)}</small>
+    ${recordText}
   </div>`;
 }
 

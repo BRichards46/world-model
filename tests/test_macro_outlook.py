@@ -124,3 +124,40 @@ def test_outlook_states_stance_risk_tier_and_why() -> None:
     assert "followed 12% of months like this (5 separate episodes), against 3% when" in why and "36% in the defensive state" in why
     assert "elevated core PCE is also on: since 2005, 3-month volatility averaged 12.7% vs 11.4%" in why
     assert "risk is above normal" in outlook["headline"]
+
+
+def _benchmarks() -> dict:
+    return {
+        "upcoming": [
+            {"target_id": "headline_cpi_mom", "reference_month": "2026-11", "kalshi": 0.01,
+             "kalshi_range_80": [-0.15, 0.16], "kalshi_range_open": [False, False], "cleveland": 0.14},
+            {"target_id": "payroll_change", "reference_month": "2026-11", "kalshi": 88.0,
+             "kalshi_range_80": [3.0, 125.0], "kalshi_range_open": [False, True], "cleveland": None},
+            {"target_id": "payroll_change", "reference_month": "2026-12", "kalshi": 140.0},
+        ],
+        "track_record": {
+            "headline_cpi_mom": {"releases": 59, "start": "2021-10", "mae": {"ours": 0.21, "kalshi": 0.09, "cleveland": 0.12}},
+        },
+    }
+
+
+def test_outlook_shows_the_market_beside_our_forecast_for_the_same_month() -> None:
+    outlook = build_macro_outlook(_quad(), _overlay(), _releases(), _snapshot(), None, _benchmarks())
+    cpi = next(r for r in outlook["releases"] if r["id"] == "cpi")
+    headline = cpi["forecasts"][0]
+    assert headline["market"] == 0.01 and headline["cleveland"] == 0.14
+    assert headline["track_record"]["mae"]["kalshi"] == 0.09
+    assert "the market's expectation would move it about -0.1 pp" in cpi["meaning"][0]
+    assert "well above the market" in cpi["meaning"][1]
+    jobs = next(r for r in outlook["releases"] if r["id"] == "jobs")
+    payrolls = jobs["forecasts"][0]
+    assert payrolls["market"] == 88.0  # November, not the December market
+    assert payrolls["market_range_open"] == [False, True]
+    assert any("market expects about +88k against our +178k" in line for line in jobs["meaning"])
+
+
+def test_outlook_without_benchmarks_keeps_our_forecast_wording() -> None:
+    outlook = build_macro_outlook(_quad(), _overlay(), _releases(), _snapshot())
+    cpi = next(r for r in outlook["releases"] if r["id"] == "cpi")
+    assert cpi["forecasts"][0]["market"] is None
+    assert "our forecast would move it" in cpi["meaning"][0]

@@ -73,6 +73,8 @@ echo "Describing risk for the current overlay state..."
 "$PYTHON" -m world_model.cli.equity_risk_context
 echo "Refreshing payroll and inflation release forecasts..."
 "$PYTHON" -m world_model.cli.macro_release_forecast
+echo "Scoring release forecasts against Kalshi and the Cleveland Fed nowcast..."
+"$PYTHON" -m world_model.cli.release_benchmarks || echo "WARNING: release benchmarks failed (network?); continuing." >&2
 echo "Writing the outlook summary..."
 "$PYTHON" -m world_model.cli.macro_outlook
 

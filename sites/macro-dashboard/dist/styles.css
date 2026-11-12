@@ -522,6 +522,18 @@ button { color: inherit; }
 .range-legend .r50, .range-bar .r50 { background: color-mix(in srgb, var(--accent) 55%, transparent); }
 .range-legend .point, .range-bar .point { background: var(--text); }
 .range-legend .prior, .range-bar .prior { background: var(--warning); }
+.range-bar:has(.market) { height: 19px; }
+.range-bar .m80 { top: 15px; height: 3px; }
+.range-legend .m80 { height: 3px; }
+.range-legend .m80, .range-bar .m80 { background: var(--housing); }
+.range-legend .market, .range-bar .market { background: var(--housing); }
+.range-bar .market { width: 8px; height: 8px; top: 12.5px; margin-left: -4px; transform: rotate(45deg); }
+.range-legend .market { width: 7px; height: 7px; transform: rotate(45deg); }
+.outlook-forecast-market { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; margin-top: 2px; }
+.outlook-forecast-market span { color: var(--muted); }
+.outlook-forecast-market strong { font: 600 13px var(--mono); color: var(--housing); }
+.outlook-forecast-market small { display: inline; }
+.outlook-forecast .outlook-record { margin-top: 2px; }
 .outlook-release-meaning { margin: 0; padding-left: 15px; }
 .outlook-release-meaning li + li { margin-top: 3px; }
 .outlook-notes { margin: 0; padding: 4px 28px 14px 43px; color: var(--muted); font: 9px/1.5 var(--mono); }
@@ -611,3 +623,5 @@ button { color: inherit; }
 @media (prefers-reduced-motion: reduce) {
   .drawer-panel, .drawer-backdrop { transition: none; }
 }
+.outlook-forecast-market strong.cleveland { color: var(--text); }
+.outlook-forecast-market .nowrap { white-space: nowrap; }
