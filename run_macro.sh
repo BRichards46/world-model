@@ -48,6 +48,9 @@ mkdir -p "$OUTPUT_DIR"
 
 export PYTHONPATH="$PROJECT_DIR/src${PYTHONPATH:+:$PYTHONPATH}"
 
+echo "Checking that the Norgate update has finished writing..."
+"$PYTHON" -m world_model.cli.wait_for_norgate
+
 echo "Building incremental macro dashboard data..."
 if [ "${#dashboard_args[@]}" -gt 0 ]; then
   "$PYTHON" -m world_model.cli.macro_dashboard "${dashboard_args[@]}"

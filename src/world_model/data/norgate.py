@@ -1,14 +1,69 @@
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
 import numpy as np
 import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 
 DEFAULT_COMMON_STOCK_EXCHANGES = ("NYSE", "Nasdaq", "NYSE American")
+CATALOG_NAME = "price_file_catalog.parquet"
+
+
+def read_parquet_settled(path: str | Path, columns: list[str] | None = None, attempts: int = 6, wait_seconds: float = 10.0):
+    """Read a parquet file that the Norgate update may be rewriting in place.
+
+    The Norgate job (Windows, via a Parallels shared folder) rewrites the catalog by truncating and copying
+    into the same file, so a read mid-write sees a file with no parquet footer. Retry for about a minute
+    before giving up.
+    """
+    last_error: Exception | None = None
+    for attempt in range(attempts):
+        try:
+            return pd.read_parquet(path, columns=columns)
+        except (pa.ArrowInvalid, OSError) as error:
+            last_error = error
+            if attempt < attempts - 1:
+                time.sleep(wait_seconds)
+    raise RuntimeError(f"{path} is unreadable after {attempts} attempts; is the Norgate update still writing it?") from last_error
+
+
+def wait_for_settled_catalog(
+    metadata_root: str | Path,
+    quiet_seconds: float = 180.0,
+    timeout_seconds: float = 3600.0,
+    poll_seconds: float = 30.0,
+    log=print,
+) -> bool:
+    """Wait until the Norgate price catalog has not changed for ``quiet_seconds`` and parses.
+
+    Returns False on timeout (the caller decides whether to proceed with the last good data).
+    """
+    path = Path(metadata_root).expanduser() / CATALOG_NAME
+    deadline = time.monotonic() + timeout_seconds
+    announced = False
+    while True:
+        try:
+            age = time.time() - path.stat().st_mtime
+            if age >= quiet_seconds:
+                pq.read_metadata(path)
+                return True
+            reason = f"changed {age:.0f}s ago"
+        except (FileNotFoundError, pa.ArrowInvalid, OSError) as error:
+            reason = f"not readable ({type(error).__name__})"
+        if time.monotonic() >= deadline:
+            if log:
+                log(f"Norgate catalog still unsettled after {timeout_seconds / 60:.0f} min: {reason}.")
+            return False
+        if log and not announced:
+            log(f"Waiting for the Norgate update to finish writing its catalog ({reason})...")
+            announced = True
+        time.sleep(poll_seconds)
 
 
 def read_catalog_price_series(
@@ -24,7 +79,7 @@ def read_catalog_price_series(
     catalog_path = metadata / "price_file_catalog.parquet"
     if not catalog_path.exists():
         raise FileNotFoundError(catalog_path)
-    catalog = pd.read_parquet(catalog_path)
+    catalog = read_parquet_settled(catalog_path)
     rows = catalog[
         catalog["symbol"].astype(str).eq(symbol)
         & catalog["dataset"].astype(str).eq("equities")
@@ -36,7 +91,7 @@ def read_catalog_price_series(
     path = metadata.parent / str(row["relative_path"])
     if path.parent.resolve() != prices.resolve():
         raise ValueError(f"Norgate catalog path for {symbol} is outside the configured price root: {path}")
-    data = pd.read_parquet(path, columns=["date", column])
+    data = read_parquet_settled(path, columns=["date", column])
     data["date"] = pd.to_datetime(data["date"], errors="coerce")
     data[column] = pd.to_numeric(data[column], errors="coerce")
     data = data.dropna().sort_values("date").drop_duplicates("date", keep="last")
@@ -58,7 +113,7 @@ def read_catalog_price_frame(
     catalog_path = metadata / "price_file_catalog.parquet"
     if not catalog_path.exists():
         raise FileNotFoundError(catalog_path)
-    catalog = pd.read_parquet(catalog_path)
+    catalog = read_parquet_settled(catalog_path)
     rows = catalog[
         catalog["symbol"].astype(str).eq(symbol)
         & catalog["dataset"].astype(str).eq("equities")
@@ -71,7 +126,7 @@ def read_catalog_price_frame(
     if path.parent.resolve() != prices.resolve():
         raise ValueError(f"Norgate catalog path for {symbol} is outside the configured price root: {path}")
     requested = ["date", *columns]
-    data = pd.read_parquet(path, columns=requested)
+    data = read_parquet_settled(path, columns=requested)
     data["date"] = pd.to_datetime(data["date"], errors="coerce")
     for column in columns:
         data[column] = pd.to_numeric(data[column], errors="coerce")
@@ -93,7 +148,7 @@ def read_norgate_index_series(
     catalog_path = metadata / "price_file_catalog.parquet"
     if not catalog_path.exists():
         raise FileNotFoundError(catalog_path)
-    catalog = pd.read_parquet(catalog_path)
+    catalog = read_parquet_settled(catalog_path)
     rows = catalog[
         catalog["symbol"].astype(str).eq(symbol)
         & catalog["dataset"].astype(str).eq(dataset)
@@ -106,7 +161,7 @@ def read_norgate_index_series(
     path = (metadata.parent / str(row["relative_path"])).resolve()
     if norgate_root not in path.parents:
         raise ValueError(f"Norgate catalog path for {symbol} is outside the Norgate root: {path}")
-    data = pd.read_parquet(path, columns=["date", column])
+    data = read_parquet_settled(path, columns=["date", column])
     data["date"] = pd.to_datetime(data["date"], errors="coerce")
     data[column] = pd.to_numeric(data[column], errors="coerce")
     data = data.dropna().sort_values("date").drop_duplicates("date", keep="last")
@@ -128,7 +183,7 @@ def load_norgate_metadata(metadata_root: str | Path) -> pd.DataFrame:
     path = Path(metadata_root).expanduser() / "symbol_metadata_exported.parquet"
     if not path.exists():
         raise FileNotFoundError(path)
-    metadata = pd.read_parquet(path)
+    metadata = read_parquet_settled(path)
     metadata["assetid"] = pd.to_numeric(metadata["assetid"], errors="coerce").astype("Int64")
     return metadata
 
@@ -194,7 +249,7 @@ def build_market_breadth(
             skipped += 1
             continue
         try:
-            data = pd.read_parquet(path, columns=["date", "close", "major_exchange_listed"])
+            data = read_parquet_settled(path, columns=["date", "close", "major_exchange_listed"], attempts=1)
         except Exception:
             skipped += 1
             continue

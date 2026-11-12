@@ -178,7 +178,8 @@ def update_ladders(series: str, cache_dir: str | Path, pause: float = 0.05, log:
         if log and i % 100 == 0:
             log(f"  {series}: {i}/{len(markets)} markets")
         time.sleep(pause)
-    table = pd.concat([cached, pd.DataFrame.from_records(rows, columns=LADDER_COLUMNS)], ignore_index=True)
+    frames = [frame for frame in (cached, pd.DataFrame.from_records(rows, columns=LADDER_COLUMNS)) if len(frame)]
+    table = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame(columns=LADDER_COLUMNS)
     table = table.drop_duplicates("ticker", keep="last").sort_values(["reference_month", "event_ticker", "strike"])
     path.parent.mkdir(parents=True, exist_ok=True)
     table.to_parquet(path, index=False)
