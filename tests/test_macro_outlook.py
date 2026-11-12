@@ -174,3 +174,15 @@ def test_outlook_uses_the_bottom_up_headline_when_present() -> None:
     assert cpi["forecasts"][0]["forecast"] == 0.14 and cpi["forecasts"][0]["validated"]
     assert any("market has missed by 0.09 pp on average, our model by 0.21" in line for line in cpi["meaning"])
     assert "Only headline CPI beats a naive forecast" in " ".join(outlook["notes"])
+
+
+def test_outlook_uses_the_bottom_up_core_when_present() -> None:
+    releases = _releases()
+    releases["forecasts"].append(
+        {"target_id": "core_cpi_mom", "variant_id": "bottom_up", "reference_month": "2026-11", "forecast": 0.24,
+         "range_50": [0.15, 0.31], "range_80": [0.02, 0.34], "unit": "percent", "validated": True}
+    )
+    outlook = build_macro_outlook(_quad(), _overlay(), releases, _snapshot())
+    cpi = next(r for r in outlook["releases"] if r["id"] == "cpi")
+    core = next(f for f in cpi["forecasts"] if f["label"] == "Core")
+    assert core["forecast"] == 0.24 and core["validated"]

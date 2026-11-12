@@ -40,6 +40,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Score headline CPI on the bottom-up nowcast when this backtest exists.",
     )
     parser.add_argument(
+        "--core-bottom-up",
+        default=str(root / "outputs" / "core_cpi" / "core_cpi_backtest.parquet"),
+        help="Score core CPI on the bottom-up nowcast when this backtest exists.",
+    )
+    parser.add_argument(
         "--site-json-out",
         default=str(root / "sites" / "macro-dashboard" / "dist" / "data" / "release_benchmarks.json"),
     )
@@ -73,8 +78,15 @@ def main(argv: list[str] | None = None) -> None:
         reference_month=lambda f: pd.to_datetime(f["observation_date"]).dt.to_period("M").dt.to_timestamp()
     )[["reference_month", "release_date"]].drop_duplicates("reference_month")
     levels = prior_payroll_levels(load_vintage_table(roots["fred"], "PAYEMS"), payroll_rows)
-    bottom_up_path = Path(args.headline_bottom_up).expanduser()
-    bottom_up = pd.read_parquet(bottom_up_path) if bottom_up_path.exists() else None
+    bottom_up_paths = {
+        "headline_cpi_mom": (Path(args.headline_bottom_up).expanduser(), "headline", "energy_cpi_summary.json"),
+        "core_cpi_mom": (Path(args.core_bottom_up).expanduser(), "core", "core_cpi_summary.json"),
+    }
+    bottom_up = {}
+    for target_id, (path, column, _) in bottom_up_paths.items():
+        if path.exists():
+            table = pd.read_parquet(path)
+            bottom_up[target_id] = pd.Series(table[f"{column}_forecast"].to_numpy(float), index=pd.to_datetime(table["month"]))
     comparison = build_comparison(our_forecasts(forecasts, levels, bottom_up), market, cleveland)
     summary = summarize(comparison)
 
@@ -83,7 +95,8 @@ def main(argv: list[str] | None = None) -> None:
         open_ladders = kalshi.open_ladders(KALSHI_SERIES)
         open_market = kalshi_expectations(open_ladders) if not open_ladders.empty else pd.DataFrame()
         current_ours = _current_ours(Path(args.current))
-        current_ours.update(_current_bottom_up(bottom_up_path.with_name("energy_cpi_summary.json")))
+        for target_id, (path, column, summary_name) in bottom_up_paths.items():
+            current_ours.update(_current_bottom_up(path.with_name(summary_name), target_id, column))
         upcoming = current_expectations(open_market, cleveland, current_ours)
 
     output = Path(args.output_dir).expanduser()
@@ -106,13 +119,13 @@ def main(argv: list[str] | None = None) -> None:
         print(f"  {record['label']}: {common.get('releases', 0)} common releases, MAE " + ", ".join(parts))
 
 
-def _current_bottom_up(path: Path) -> dict[str, float]:
+def _current_bottom_up(path: Path, target_id: str, column: str) -> dict[str, float]:
     if not path.exists():
         return {}
     current = json.loads(path.read_text(encoding="utf-8")).get("current", {})
-    if current.get("headline") is None:
+    if current.get(column) is None:
         return {}
-    return {f"headline_cpi_mom:{current['month']}": float(current["headline"])}
+    return {f"{target_id}:{current['month']}": float(current[column])}
 
 
 def _current_ours(path: Path) -> dict[str, float]:

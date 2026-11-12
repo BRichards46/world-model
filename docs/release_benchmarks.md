@@ -87,6 +87,9 @@ as the news.
 
 ## On the dashboard
 
+Headline and core CPI are scored on their bottom-up nowcasts (docs/energy_cpi.md,
+docs/core_cpi.md), which are what the dashboard shows.
+
 The run writes `sites/macro-dashboard/dist/data/release_benchmarks.json`, and
 `macro_outlook` attaches it to each upcoming release card. Each card shows:
 - the market's expectation and 80% range (blue);

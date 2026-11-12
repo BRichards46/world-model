@@ -21,6 +21,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--data-roots", default=str(root / "config" / "data_roots.yml"))
     parser.add_argument("--forecasts", default=str(root / "outputs" / "macro_release_forecast" / "macro_release_forecasts.parquet"))
     parser.add_argument("--current", default=str(root / "outputs" / "macro_release_forecast" / "macro_release_current_forecasts.csv"))
+    parser.add_argument(
+        "--core-bottom-up",
+        default=str(root / "outputs" / "core_cpi" / "core_cpi_backtest.parquet"),
+        help="Use the bottom-up core CPI nowcast for the core block when this backtest exists.",
+    )
     parser.add_argument("--benchmarks", default=str(root / "outputs" / "release_benchmarks" / "release_comparison.parquet"))
     parser.add_argument("--output-dir", default=str(root / "outputs" / "energy_cpi"))
     parser.add_argument("--start", default="2013-06-01")
@@ -37,7 +42,8 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     roots = load_yaml(args.data_roots)
     tables = load_tables(roots["fred"])
-    ours = _core_forecasts(Path(args.forecasts))
+    core_path = Path(args.core_bottom_up).expanduser()
+    ours = _bottom_up_core(core_path) or _core_forecasts(Path(args.forecasts))
     results = backtest(tables, start=args.start, core_forecasts=ours)
 
     summary = {"blocks": {}, "headline_vs_benchmarks": None}
@@ -56,7 +62,9 @@ def main(argv: list[str] | None = None) -> int:
     bench_path = Path(args.benchmarks)
     if bench_path.exists():
         bench = pd.read_parquet(bench_path)
-        bench = bench[bench["target_id"] == "headline_cpi_mom"][["reference_month", "ours", "kalshi", "cleveland", "naive"]]
+        bench = bench[bench["target_id"] == "headline_cpi_mom"][["reference_month", "kalshi", "cleveland", "naive"]]
+        # The benchmark file now scores the bottom-up nowcast as ours, so the old model is read from its own output.
+        bench = bench.merge(_pipeline(Path(args.forecasts), "headline_cpi_mom").rename("ours"), left_on="reference_month", right_index=True, how="left")
         joined = results[results["core_source"] == "ours"].rename(columns={"month": "reference_month"}).merge(bench, on="reference_month", how="left")
         joined = joined.rename(columns={"headline_forecast": "bottom_up", "headline_actual": "actual", "ours": "previous_model"})
         summary["headline_vs_benchmarks"] = {
@@ -69,7 +77,9 @@ def main(argv: list[str] | None = None) -> int:
     released = results["month"].max() if len(results) else None
     if released is not None and month <= released:
         month = released + pd.DateOffset(months=1)
-    current_core = _current_core(Path(args.current), month)
+    current_core = _current_bottom_up_core(core_path.with_name("core_cpi_summary.json"), month)
+    if current_core is None:
+        current_core = _current_core(Path(args.current), month)
     live = nowcast(tables, month, cutoff, current_core)
     summary["current"] = {
         "month": f"{month:%Y-%m}",
@@ -127,6 +137,32 @@ def _core_forecasts(path: Path) -> dict[pd.Timestamp, float]:
     table = pd.read_parquet(path)
     table = table[(table["target_id"] == "core_cpi_mom") & (table["variant_id"] == "pipeline")]
     return {pd.Timestamp(r.observation_date).to_period("M").to_timestamp(): float(r.forecast) for r in table.itertuples()}
+
+
+def _bottom_up_core(path: Path) -> dict[pd.Timestamp, float]:
+    if not path.exists():
+        return {}
+    table = pd.read_parquet(path).dropna(subset=["core_forecast"])
+    return {pd.Timestamp(r.month): float(r.core_forecast) for r in table.itertuples()}
+
+
+def _current_bottom_up_core(path: Path, month: pd.Timestamp) -> float | None:
+    if not path.exists():
+        return None
+    current = json.loads(path.read_text(encoding="utf-8")).get("current", {})
+    if current.get("core") is None or current.get("month") != f"{month:%Y-%m}":
+        return None
+    return float(current["core"])
+
+
+def _pipeline(path: Path, target_id: str) -> pd.Series:
+    """The release module's single-equation forecast for ``target_id``, keyed by month."""
+    if not path.exists():
+        return pd.Series(dtype=float)
+    table = pd.read_parquet(path)
+    table = table[(table["target_id"] == target_id) & (table["variant_id"] == "pipeline")]
+    months = pd.to_datetime(table["observation_date"]).dt.to_period("M").dt.to_timestamp()
+    return pd.Series(table["forecast"].to_numpy(float), index=months)
 
 
 def _baseline(path: Path) -> pd.Series:

@@ -12,7 +12,7 @@ release.
 | Fuel oil | Retail diesel this month and last (trailing regression) |
 | Energy | The four blocks, with weights fitted on the trailing three years |
 | Food | Average of its last three monthly changes |
-| Core | Our walk-forward core CPI forecast (`macro_release_forecast`) |
+| Core | The bottom-up core CPI nowcast (`core_cpi`, see docs/core_cpi.md); falls back to `macro_release_forecast` when that hasn't run |
 | Headline | Core, food and energy, with weights fitted on the trailing three years |
 
 Retail gasoline, diesel and Henry Hub prices are effectively never revised.
@@ -29,6 +29,9 @@ Outputs, in `outputs/energy_cpi/`:
 - `energy_cpi_summary.json`: accuracy, the comparison with the market and the Cleveland Fed, and the live nowcast.
 
 ## Results (run 2026-11-12, releases June 2013 to October 2026)
+
+These results use our previous core model. With the bottom-up core, the
+headline miss is 0.091 (docs/core_cpi.md).
 
 | Block | Average miss (pp) | Typical monthly move (sd) |
 |---|---:|---:|
@@ -82,5 +85,6 @@ and the Cleveland Fed.
 - **Electricity and food.** These are now simple trailing averages: electricity
   has a correlation of 0.15 with the outcome, food 0.65. EIA prices and PPI food
   would help.
-- **Core.** The larger remaining gap: shelter from new-lease rents, used cars
-  from Manheim, car insurance.
+- **Core.** Now built bottom-up (docs/core_cpi.md), which cut the headline miss
+  from 0.100 to 0.091. Further gains need outside data: Manheim used-car prices,
+  new-lease rents, car insurance.

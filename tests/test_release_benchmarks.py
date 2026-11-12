@@ -126,3 +126,17 @@ def test_ladder_range_is_flagged_open_when_it_runs_past_the_last_strike():
     assert implied["low_open"] is False
     assert implied["high_open"] is True
     assert implied["high"] == pytest.approx(0.25)
+
+
+def test_our_forecasts_score_bottom_up_targets_on_the_bottom_up_nowcast():
+    from world_model.states.release_benchmarks import our_forecasts
+    months = pd.date_range("2026-01-01", periods=3, freq="MS")
+    forecasts = pd.DataFrame({
+        "target_id": ["core_cpi_mom"] * 3, "variant_id": ["pipeline"] * 3, "observation_date": months,
+        "release_date": months + pd.DateOffset(days=40), "actual": [0.2, 0.3, 0.25],
+        "forecast": [0.5, 0.5, 0.5], "baseline_forecast": [0.1, 0.1, 0.1],
+    })
+    bottom_up = {"core_cpi_mom": pd.Series([0.21, 0.29], index=months[:2])}
+    scored = our_forecasts(forecasts, None, bottom_up)
+    assert list(scored["ours"]) == [0.21, 0.29]
+    assert list(scored["naive"]) == [0.1, 0.1]

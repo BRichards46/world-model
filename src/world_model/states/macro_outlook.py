@@ -47,9 +47,10 @@ def build_macro_outlook(
     overlay = overlay or {}
     rows = {str(row.get("indicator_id")): row for row in snapshot}
     forecasts = {(row["target_id"], row["variant_id"]): row for row in (releases or {}).get("forecasts", [])}
-    if ("headline_cpi_mom", "bottom_up") in forecasts:
-        # The bottom-up nowcast replaces the single-equation headline model wherever the outlook reads it.
-        forecasts[("headline_cpi_mom", "pipeline")] = forecasts.pop(("headline_cpi_mom", "bottom_up"))
+    for target_id in ("headline_cpi_mom", "core_cpi_mom"):
+        if (target_id, "bottom_up") in forecasts:
+            # The bottom-up nowcast replaces the single-equation model wherever the outlook reads it.
+            forecasts[(target_id, "pipeline")] = forecasts.pop((target_id, "bottom_up"))
     forecasts = _with_outside_views(forecasts, benchmarks or {})
     quarters = list(quad.get("quarters", []))
     current_index = next((i for i, q in enumerate(quarters) if q.get("is_current_quarter")), None)
