@@ -240,8 +240,11 @@ Outputs:
 - `outputs/labor_quad_backtest.parquet`: the walk-forward.
 - `outputs/quad_asset_performance_labor/`: the asset and playbook tests.
 
-The Quads tab shows the payroll quad above the GDP quad, and the quad strip
-shows its current-quarter call.
+The payroll quad leads the dashboard's regime calls: the outlook headline, its
+"Where the regime model points" quarters and the quad strip all use it. The GDP
+quad's call appears beside them only where it disagrees. If the payroll quad is
+missing, the GDP quad leads as before. The Quads tab shows the payroll quad
+above the GDP quad's full detail.
 
 ## Limits
 

@@ -41,6 +41,7 @@ def build_macro_outlook(
     snapshot: Iterable[Mapping[str, Any]],
     risk_context: Mapping[str, Any] | None = None,
     benchmarks: Mapping[str, Any] | None = None,
+    labor_quad: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     quad = quad or {}
     risk_context = risk_context or {}
@@ -54,38 +55,42 @@ def build_macro_outlook(
     forecasts = _with_outside_views(forecasts, benchmarks or {})
     quarters = list(quad.get("quarters", []))
     current_index = next((i for i, q in enumerate(quarters) if q.get("is_current_quarter")), None)
-    realized = [q for q in quarters if q.get("status") == "realized"]
-    horizons = {int(h["horizon"]): h for h in quad.get("backtest", {}).get("horizons", [])}
     inputs = {item["id"]: item for item in overlay.get("inputs", [])}
     triggers = overlay.get("triggers", {}) or {}
 
+    # The payroll quad leads when it is available: it has been the more accurate call for the current and next
+    # quarter (docs/growth_inflation_quad.md). The GDP quad is kept as a reference where the two disagree.
+    regime = labor_quad if _has_current(labor_quad) else quad
+    regime_quarters = list(regime.get("quarters", []))
+    regime_index = next((i for i, q in enumerate(regime_quarters) if q.get("is_current_quarter")), None)
+    regime_realized = [q for q in regime_quarters if q.get("status") == "realized"]
     ahead = []
-    if current_index is not None:
-        for offset, quarter in enumerate(quarters[current_index : current_index + 3]):
-            probability = _number(quarter.get("probability_top"))
-            hit_rate = _number(horizons.get(offset, {}).get("quad_hit_rate"))
-            quad_id = int(quarter.get("probability_quad") or quarter.get("quad"))
-            ahead.append(
-                {
-                    "quarter": quarter.get("quarter"),
-                    "status": quarter.get("status"),
-                    "quad": quad_id,
-                    "name": QUAD_NAME.get(quad_id, ""),
-                    "description": QUAD_SHORT.get(quad_id, ""),
-                    "probability": probability,
-                    "conviction": _conviction(probability),
-                    "historical_hit_rate": hit_rate,
-                }
-            )
+    if regime_index is not None:
+        for offset, quarter in enumerate(regime_quarters[regime_index : regime_index + 3]):
+            call = _call(regime, quarter.get("quarter"), offset)
+            if call is None:
+                continue
+            item = {
+                "quarter": quarter.get("quarter"),
+                "status": quarter.get("status"),
+                **call,
+                "conviction": _conviction(call["probability"]),
+                "model": "payroll" if regime is labor_quad else "gdp",
+            }
+            if regime is labor_quad:
+                gdp = _call(quad, quarter.get("quarter"), offset)
+                item["gdp"] = None if gdp is None else {**gdp, "agrees": gdp["quad"] == call["quad"]}
+            ahead.append(item)
 
     now = []
-    if realized and ahead:
-        last = realized[-1]
+    if regime_realized and ahead:
+        last = regime_realized[-1]
         current = ahead[0]
+        measure = " on payrolls" if regime is labor_quad else ""
         now.append(
             {
                 "label": "Regime",
-                "text": f"{_q(last['quarter'])} was {QUAD_NAME.get(int(last['quad']), '')} ({QUAD_SHORT.get(int(last['quad']), '')}). "
+                "text": f"{_q(last['quarter'])} was {QUAD_NAME.get(int(last['quad']), '')} ({QUAD_SHORT.get(int(last['quad']), '')}){measure}. "
                 f"{_q(current['quarter'])} is tracking {current['name']} ({current['description']}), "
                 f"{_pct(current['probability'])} likely.",
             }
@@ -134,7 +139,7 @@ def build_macro_outlook(
                 "date_is_estimate": bool(row.get("expected_next_release_is_estimate")),
                 "reference": _reference(release_id, row, shown),
                 "forecasts": shown,
-                "meaning": _meaning(release_id, quad, quarters, current_index, overlay, rows, forecasts),
+                "meaning": _meaning(release_id, quad, quarters, current_index, overlay, rows, forecasts, ahead),
             }
         )
     upcoming.sort(key=lambda item: item["date"])
@@ -148,6 +153,16 @@ def build_macro_outlook(
         "notes": [
             "Regimes describe the growth and inflation backdrop; they are not trading signals. The equity risk "
             "overlay is the only validated signal here.",
+            *(
+                [
+                    "Regimes measure growth with payrolls rather than GDP: the payroll quad has called the current quarter "
+                    f"right {_pct(_number(labor_quad['backtest']['horizons'][0].get('quad_hit_rate')))} of the time, "
+                    f"against {_pct(_number(labor_quad['backtest']['horizons'][0].get('gdp_quad_hit_rate')))} for the GDP quad. "
+                    "The GDP quad's call is shown only where it disagrees."
+                ]
+                if labor_quad and (labor_quad.get("backtest") or {}).get("horizons")
+                else []
+            ),
             "Forecast ranges come from the model's own out-of-sample misses over the last five years. "
             + _validated_note(forecasts),
             "Market expectations are the median of Kalshi's prices on each range of the print. The market has been "
@@ -156,6 +171,42 @@ def build_macro_outlook(
             "Release dates marked ≈ are estimated from the last release and can be off by a few days.",
         ],
     }
+
+
+def _has_current(payload: Mapping[str, Any] | None) -> bool:
+    return bool(payload) and any(q.get("is_current_quarter") and q.get("quad") is not None for q in payload.get("quarters", []))
+
+
+def _call(payload: Mapping[str, Any] | None, quarter: str | None, horizon: int) -> dict[str, Any] | None:
+    """A quad model's call for ``quarter``: its most likely quad, that probability and its walk-forward hit rate."""
+    if not payload or not quarter:
+        return None
+    row = next((q for q in payload.get("quarters", []) if q.get("quarter") == quarter), None)
+    if row is None or row.get("quad") is None:
+        return None
+    probabilities = {int(k): _number(v) for k, v in (row.get("probabilities") or {}).items() if _number(v) is not None}
+    if probabilities:
+        quad_id = max(probabilities, key=probabilities.get)
+        probability = probabilities[quad_id]
+    else:
+        quad_id = int(row.get("probability_quad") or row["quad"])
+        probability = _number(row.get("probability_top"))
+    horizons = {int(h["horizon"]): h for h in payload.get("backtest", {}).get("horizons", [])}
+    return {
+        "quad": quad_id,
+        "name": QUAD_NAME.get(quad_id, ""),
+        "description": QUAD_SHORT.get(quad_id, ""),
+        "probability": probability,
+        "historical_hit_rate": _number(horizons.get(horizon, {}).get("quad_hit_rate")),
+    }
+
+
+def _lean_name(ahead: list[Mapping[str, Any]] | None, following: Mapping[str, Any]) -> str:
+    """The regime call for ``following``'s quarter: the outlook's own (payroll-led) call, else the GDP quad's."""
+    item = next((a for a in ahead or [] if a.get("quarter") == following.get("quarter")), None)
+    if item:
+        return item["name"]
+    return QUAD_NAME.get(int(following.get("probability_quad") or following.get("quad") or 0), "current")
 
 
 def _headline(ahead: list[dict[str, Any]], overlay: Mapping[str, Any], risk_context: Mapping[str, Any] | None = None) -> str:
@@ -342,6 +393,7 @@ def _meaning(
     overlay: Mapping[str, Any],
     rows: Mapping[str, Mapping[str, Any]],
     forecasts: Mapping[tuple[str, str], Mapping[str, Any]],
+    ahead: list[Mapping[str, Any]] | None = None,
 ) -> list[str]:
     current = quarters[current_index] if current_index is not None else None
     following = quarters[current_index + 1] if current_index is not None and current_index + 1 < len(quarters) else None
@@ -385,7 +437,7 @@ def _meaning(
             lines.append(
                 f"{_q(following['quarter'])} inflation rises only if monthly CPI averages above {next_hurdle:.2f}% "
                 f"(the model assumes {base:.2f}%). A run of prints at that pace would undercut the "
-                f"{QUAD_NAME.get(int(following.get('probability_quad') or following.get('quad') or 0), 'current')} lean."
+                f"{_lean_name(ahead, following)} lean."
             )
         lines.append("Not a risk-overlay input: inflation failed every GTT risk test.")
 

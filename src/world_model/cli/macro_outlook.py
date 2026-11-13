@@ -29,6 +29,7 @@ def main(argv: list[str] | None = None) -> int:
         _load(data / "snapshot.json") or [],
         _load(data / "risk_context.json"),
         _load(data / "release_benchmarks.json"),
+        _load(data / "labor_quad.json"),
     )
     target = data / "outlook.json"
     target.write_text(json.dumps(outlook, indent=2) + "\n")

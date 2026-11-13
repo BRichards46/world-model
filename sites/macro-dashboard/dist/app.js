@@ -222,7 +222,9 @@ function quadQuarterShort(label) { const match = /^(\d{4})Q(\d)$/.exec(label || 
 
 function renderQuadStrip() {
   const container = document.getElementById("quad-strip");
-  const rows = quadRows();
+  // The payroll quad leads (the more accurate call); the GDP quad is the fallback and a reference line.
+  const payrollLed = laborQuadCurrent(state.laborQuad) != null;
+  const rows = payrollLed ? laborQuadRows(state.laborQuad) : quadRows();
   if (!rows.length) {
     container.hidden = true;
     return;
@@ -234,10 +236,10 @@ function renderQuadStrip() {
   const current = ahead.find((row) => row.is_current_quarter) || ahead[0];
   const cells = [...realized.slice(-2), ...ahead];
   container.innerHTML = `<div class="quad-state">
-      <div class="eyebrow">GROWTH × INFLATION QUAD</div>
+      <div class="eyebrow">GROWTH × INFLATION QUAD${payrollLed ? " · PAYROLLS" : ""}</div>
       <div class="quad-state-line">${quadBadge(current?.quad, "large")}<h2>${current ? `${escapeHtml(current.quarter)} ${escapeHtml(current.status === "partial" ? "partly reported" : "projected")}` : "No projection"}</h2></div>
       <p>${current ? `${escapeHtml(QUAD_META[current.quad]?.short || "")} · ${escapeHtml(quadAgreement(current) || "base case")}.` : ""} Last realized: ${lastRealized ? `${escapeHtml(lastRealized.quarter)} ${escapeHtml(quadName(lastRealized.quad))}` : "n/a"}.</p>
-      ${laborQuadLineMarkup(state.laborQuad)}
+      ${payrollLed ? gdpQuadLineMarkup(current) : ""}
       <button class="quad-link" type="button" data-open-quads>Open base-effect outlook →</button>
     </div>
     <div class="quad-path">${cells.map(quadCellMarkup).join("")}</div>`;
@@ -437,10 +439,11 @@ function laborQuadCurrent(payload) {
   return ahead.find((row) => row.is_current_quarter) || ahead[0];
 }
 
-function laborQuadLineMarkup(payload) {
-  const current = laborQuadCurrent(payload);
-  if (!current) return "";
-  return `<p class="quad-alt"><span>Payroll quad</span>${quadBadge(current.quad)}<em>${escapeHtml(quadAgreement(current) || "base case")}</em></p>`;
+function gdpQuadLineMarkup(payrollRow) {
+  // Reference only: the GDP quad's call for the same quarter, shown when it differs.
+  const gdp = quadRows().find((row) => row.quarter === payrollRow?.quarter);
+  if (!gdp || gdp.quad == null || gdp.quad === payrollRow.quad) return "";
+  return `<p class="quad-alt"><span>GDP quad</span>${quadBadge(gdp.quad)}<em>${escapeHtml(quadAgreement(gdp) || "base case")}</em></p>`;
 }
 
 function laborQuadMarkup(payload) {
@@ -578,6 +581,7 @@ function renderOutlook() {
       <span class="outlook-quarter-text">${escapeHtml(item.description)}</span>
       <span class="outlook-probability"><i style="width:${probability == null ? 0 : Math.round(probability * 100)}%"></i><em>${probability == null ? "n/a" : `${Math.round(probability * 100)}%`}</em></span>
       <small>${escapeHtml(item.conviction)} conviction${hit == null ? "" : ` · right ${Math.round(hit * 100)}% of the time at this horizon`}</small>
+      ${outlookGdpMarkup(item.gdp)}
     </li>`;
   }).join("");
   const releases = (outlook.releases || []).map(outlookReleaseMarkup).join("");
@@ -595,6 +599,14 @@ function renderOutlook() {
       ${releases || `<p class="outlook-empty">No scheduled releases found.</p>`}
     </div>
     <ul class="outlook-notes">${(outlook.notes || []).map((note) => `<li>${escapeHtml(note)}</li>`).join("")}</ul>`;
+}
+
+function outlookGdpMarkup(gdp) {
+  // The GDP quad is a reference only, shown where it disagrees with the payroll-led call.
+  if (!gdp || gdp.agrees) return "";
+  const probability = numberOrNull(gdp.probability);
+  const hit = numberOrNull(gdp.historical_hit_rate);
+  return `<span class="outlook-gdp">GDP quad has ${escapeHtml(gdp.name)}${probability == null ? "" : ` (${Math.round(probability * 100)}%)`}${hit == null ? "" : `, right ${Math.round(hit * 100)}% at this horizon`}</span>`;
 }
 
 function outlookReleaseMarkup(release) {
