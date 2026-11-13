@@ -186,3 +186,43 @@ def test_outlook_uses_the_bottom_up_core_when_present() -> None:
     cpi = next(r for r in outlook["releases"] if r["id"] == "cpi")
     core = next(f for f in cpi["forecasts"] if f["label"] == "Core")
     assert core["forecast"] == 0.24 and core["validated"]
+
+
+
+def _labor_quad() -> dict:
+    return {
+        "backtest": {"horizons": [{"horizon": 0, "quad_hit_rate": 0.72, "gdp_quad_hit_rate": 0.59},
+                                  {"horizon": 1, "quad_hit_rate": 0.53}]},
+        "quarters": [
+            {"quarter": "2026Q3", "status": "realized", "quad": 1},
+            {"quarter": "2026Q4", "status": "partial", "is_current_quarter": True, "quad": 2,
+             "probabilities": {"1": 0.03, "2": 0.91, "3": 0.06, "4": 0.0}},
+            {"quarter": "2027Q1", "status": "projected", "quad": 1,
+             "probabilities": {"1": 0.52, "2": 0.22, "3": 0.08, "4": 0.18}},
+        ],
+    }
+
+
+def test_the_payroll_quad_leads_the_outlook():
+    outlook = build_macro_outlook(_quad(), _overlay(), _releases(), _snapshot(), labor_quad=_labor_quad())
+    current, following = outlook["ahead"]
+    assert current["model"] == "payroll" and current["probability"] == 0.91 and current["historical_hit_rate"] == 0.72
+    assert following["name"] == "Goldilocks" and following["probability"] == 0.52
+    assert "Next quarter leans Goldilocks" in outlook["headline"]
+    assert "Deflation" not in outlook["headline"] and "payrolls" not in outlook["headline"]
+    regime = next(item for item in outlook["now"] if item["label"] == "Regime")
+    assert regime["text"].startswith("Q3 2026 was Goldilocks") and "on payrolls" in regime["text"]
+
+
+def test_the_gdp_quad_is_kept_only_as_a_reference():
+    outlook = build_macro_outlook(_quad(), _overlay(), _releases(), _snapshot(), labor_quad=_labor_quad())
+    current, following = outlook["ahead"]
+    assert current["gdp"]["agrees"]
+    assert not following["gdp"]["agrees"] and following["gdp"]["name"] == "Deflation"
+    assert any("72%" in note and "59%" in note for note in outlook["notes"])
+
+
+def test_without_the_payroll_quad_the_gdp_quad_leads():
+    outlook = build_macro_outlook(_quad(), _overlay(), _releases(), _snapshot())
+    assert outlook["ahead"][0]["model"] == "gdp" and "gdp" not in outlook["ahead"][0]
+    assert "Next quarter leans Deflation" in outlook["headline"]
