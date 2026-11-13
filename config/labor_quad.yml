@@ -1,0 +1,36 @@
+# Growth × inflation quad with payrolls as the growth leg (world_model.states.labor_quad).
+# Inflation is the GDP quad's inflation leg, so run growth_inflation_quad first.
+series:
+  growth: PAYEMS
+  inflation: CPIAUCSL
+
+settings:
+  pace_months: 3          # unreported payroll months grow at the average of the last three months
+  forward_quarters: 2     # quarters shown beyond the current one
+  history_quarters: 8     # realized quarters shown before the current one
+
+probabilities:
+  minimum_history: 24     # past forecast errors needed at a horizon before probabilities are shown
+  knowledge_lag_days: 120 # a quarter's revised outcome counts as known this long after it ends
+
+backtest:
+  start: "1998-01-31"
+
+fed:
+  series: DFF             # effective fed funds rate
+  months: [6, 12]
+
+# Signal labels for the asset test of this quad (outputs/quad_asset_performance_labor/).
+signals:
+  realized_last:
+    label: Last realized payroll quad
+    note: Most recent quarter with all three payroll months and full-quarter CPI reported at the signal date.
+  projected_current:
+    label: Projected current quarter (payrolls)
+    note: Base-case payroll quad for the quarter containing the signal date.
+  projected_next:
+    label: Projected next quarter (payrolls)
+    note: Base-case payroll quad for the following quarter.
+  hindsight_current:
+    label: Hindsight current quarter (payrolls, not tradeable)
+    note: The quarter's eventual payroll quad from revised data; an upper bound.

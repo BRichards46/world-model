@@ -159,6 +159,90 @@ Outputs are in `outputs/quad_asset_performance/`, including
 `quad_asset_performance_report.md`. The Quads tab summarizes the current
 signals.
 
+## Payroll quad
+
+`world_model.states.labor_quad` (config `config/labor_quad.yml`) builds the
+same quad with nonfarm payrolls (`PAYEMS`) as the growth leg:
+- **Growth:** year-over-year growth of each quarter's average payroll level.
+  Unreported months grow at the average change of the last three months.
+- **Inflation:** the GDP quad's own inflation leg and forecast, so the two quads
+  differ only in growth.
+
+It runs after `growth_inflation_quad` and `quad_asset_performance`:
+
+```bash
+PYTHONPATH=src python3 -m world_model.cli.labor_quad
+```
+
+### Why payrolls (tested 2026-11-13)
+
+GDP makes a poor growth leg:
+- **Revisions cap accuracy.** Even a perfect forecast of the first GDP print
+  gets the growth direction right only 86% of the time against revised data. A
+  further 7 points are lost because the year-ago quarter (the hurdle) is revised
+  too.
+- **It's mostly base effects.** When the forecast is within 1 pp (annualized)
+  of the hurdle, about a third of cases, the direction is a coin flip. The
+  leading model adds nothing one quarter ahead (61%, the same as trend growth).
+- **It barely persists.** Whether GDP growth is speeding up this quarter says
+  little about next quarter (55% the same). For payrolls it's 76%.
+- **It says nothing about the Fed.** Over 1990–2026, the fed funds rate rose
+  0.42 pp more over the next two quarters after payroll growth sped up than
+  after it slowed (t 3.3). After GDP growth sped up, it rose only 0.07 pp more
+  (t 0.5).
+
+Walk-forward, 1998–2026, point-in-time vintages, each quad scored against its
+own revised data on the same month-ends:
+
+| Horizon | Payroll quad | GDP quad | Payroll growth direction | GDP growth direction |
+|---|---:|---:|---:|---:|
+| Current quarter | **72%** | 59% | **82%** | 68% |
+| Next quarter | **53%** | 46% | **70%** | 61% |
+| Two quarters ahead | 46% | 45% | 66% | 63% |
+
+Last quarter's payroll quad is known within about a week of the quarter ending.
+Unemployment and a payroll/unemployment/industrial production composite gave
+similar current-quarter accuracy. Payrolls were best one quarter ahead.
+
+**Assets.** The existing asset test, run on the payroll quad's signals, finds
+what the GDP quad found only with hindsight. After a *projected* current-quarter
+Quad 3 (3-month returns, annualized vs all months):
+
+| Asset | Spread | Early half | Late half | Evidence |
+|---|---:|---:|---:|---|
+| Russell 2000 | −15.1% | −16.9% | −14.3% | robust |
+| Consumer discretionary | −13.6% | −21.0% | −9.0% | robust |
+| Materials | −12.8% | −19.6% | −8.2% | robust |
+| S&P 500 | −10.2% | −14.3% | −8.4% | robust |
+| Utilities vs S&P 500 | +9.9% | +9.9% | +10.6% | robust |
+| Financials | −16.2% | −26.5% | −10.1% | suggestive |
+
+The unemployment version finds the same Quad 3 pattern. Projected Quad 4 has
+utilities lagging the S&P 500 by 11% (robust). The full four-quad playbook is
+still not significant: the edge is in Quad 3. Three growth legs were tried, so
+allow for some selection.
+
+**The Fed path.** After a projected payroll Quad 2, the fed funds rate rose
+about 0.4 pp over the next 12 months; after Quad 4 it fell about 0.5 pp. The
+quad explains about 5% of the variation (p ≈ 0.2–0.3 on the rotation test). No
+quad, GDP or payroll, predicted the 2-year yield's next 3-month change: the
+market already prices the Fed's leaning. Since 2008 the Fed has followed core
+PCE against its 2% target more than either growth measure.
+
+**Inflation path.** Using the bottom-up core CPI nowcast (docs/core_cpi.md) as
+the quad's inflation run-rate did not help: the inflation-direction hit rate
+changed by −1.6 to +1.1 points over 0–2 quarters ahead, none significant.
+
+Outputs:
+- `outputs/labor_quad_snapshot.json` and
+  `sites/macro-dashboard/dist/data/labor_quad.json`: quarters, probabilities,
+  walk-forward accuracy, Fed path by quad and asset evidence.
+- `outputs/labor_quad_backtest.parquet`: the walk-forward.
+- `outputs/quad_asset_performance_labor/`: the asset and playbook tests.
+
+The Quads tab shows the payroll quad above the GDP quad, and the quad strip
+shows its current-quarter call.
+
 ## Limits
 
 This is descriptive base-effect arithmetic under stated assumptions, not a
