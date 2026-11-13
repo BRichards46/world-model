@@ -64,6 +64,9 @@ echo "Building growth/inflation quads with base-effect look-ahead..."
 echo "Refreshing asset performance by quad..."
 "$PYTHON" -m world_model.cli.quad_asset_performance
 
+echo "Building the payroll quad..."
+"$PYTHON" -m world_model.cli.labor_quad || echo "WARNING: payroll quad failed; the dashboard keeps the previous one." >&2
+
 echo "Building directional momentum data..."
 "$PYTHON" -m world_model.cli.directional_momentum
 

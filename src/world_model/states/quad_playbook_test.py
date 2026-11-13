@@ -20,7 +20,7 @@ returns, preserving autocorrelation and the playbook structure.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 
 import numpy as np
 import pandas as pd
@@ -81,6 +81,9 @@ def learned_scores(
 ) -> dict[int, pd.Series]:
     """Leaders (+1) and laggards (-1) per quad from quarters known by ``as_of``."""
     labels = pd.Series(known_quads, dtype=float)
+    if labels.empty:
+        return {quad: pd.Series(0.0, index=in_quarter.columns) for quad in QUADS}
+    labels.index = pd.DatetimeIndex(labels.index)
     labels = labels[labels.index + pd.offsets.QuarterEnd(0) < as_of]
     scores = {}
     for quad in QUADS:
@@ -108,7 +111,7 @@ def portfolio_return(scores: pd.Series, volatility: pd.Series, forward: pd.Serie
 
 
 def run_playbook_test(
-    engine: GrowthInflationQuadEngine,
+    engine: GrowthInflationQuadEngine | None,
     signals: pd.DataFrame,
     cumulative: Mapping[str, pd.Series],
     calendar: pd.DatetimeIndex,
@@ -117,7 +120,10 @@ def run_playbook_test(
     lag_days: int,
     false_discovery_rate: float = 0.10,
     minimum_rotation_gap: int = 12,
+    known_quads: Callable[[pd.Timestamp], Mapping[pd.Timestamp, int]] | None = None,
 ) -> PlaybookTestResult:
+    """Follow/fade returns for each signal. ``known_quads(date)`` gives the realized quads known on a date for the
+    learned playbook; by default they are the GDP quad's, rebuilt from ``engine``'s vintages."""
     settings = config.get("playbook", {})
     assets = [asset for asset in settings.get("assets", []) if asset in cumulative]
     window = int(settings.get("volatility_window_days", 252))
@@ -128,6 +134,9 @@ def run_playbook_test(
 
     known_by_date = {}
     for date in signals.index:
+        if known_quads is not None:
+            known_by_date[date] = dict(known_quads(date))
+            continue
         realized = _realized_quads(engine.inputs_as_of(date))
         known_by_date[date] = {quarter: value["quad"] for quarter, value in realized.items()}
 

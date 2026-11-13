@@ -222,6 +222,23 @@ button { color: inherit; }
 .quad-bt-row .emph { color: var(--accent); font-weight: 700; }
 .quad-bt-row small { color: var(--muted); font-size: 8px; }
 .quad-note { margin: 0; padding: 9px 12px; color: var(--muted); font-size: 9px; line-height: 1.45; }
+.quad-alt { display: flex; align-items: center; gap: 7px; }
+.quad-alt span { color: var(--muted); font: 700 8px var(--mono); letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }
+.quad-alt em { color: var(--muted); font: normal 9px var(--mono); }
+.labor-quad .quad-path { border-bottom: 1px solid var(--line); background: var(--panel); }
+.labor-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-bottom: 1px solid var(--line); }
+.labor-block { min-width: 0; padding: 10px 12px; border-right: 1px solid var(--line-soft); }
+.labor-block:last-child { border-right: 0; }
+.labor-block h4 { margin: 0 0 6px; color: var(--accent); font: 750 9px var(--sans); letter-spacing: .1em; text-transform: uppercase; }
+.labor-block p { margin: 0 0 6px; font-size: 10px; line-height: 1.45; }
+.labor-block small { display: block; margin-top: 7px; color: var(--muted); font-size: 8px; line-height: 1.45; }
+.labor-row { display: grid; grid-template-columns: minmax(0, 1.6fr) repeat(2, minmax(0, 1fr)); gap: 6px; align-items: center; min-height: 24px; border-bottom: 1px solid var(--line-soft); font: 10px var(--mono); }
+.labor-row.five { grid-template-columns: minmax(0, 1.5fr) repeat(4, minmax(0, 1fr)); }
+.labor-row.head { color: var(--muted); font: 700 8px var(--sans); letter-spacing: .06em; text-transform: uppercase; }
+.labor-row.current { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.labor-row .up { color: var(--activity); }
+.labor-row .down { color: var(--danger); }
+.labor-row .emph { color: var(--accent); font-weight: 700; }
 .quad-method { display: grid; grid-template-columns: auto repeat(4, minmax(0, 1fr)); gap: 12px; padding: 11px 12px; border-left: 2px solid var(--accent); background: color-mix(in srgb, var(--panel-2) 35%, transparent); color: var(--muted); font-size: 8px; line-height: 1.45; }
 .quad-method strong { color: var(--text); font: 500 13px var(--serif); }
 .quad-method em { grid-column: 2 / -1; font-style: normal; color: var(--warning); }
@@ -554,6 +571,8 @@ button { color: inherit; }
   .quad-strip { grid-template-columns: 250px minmax(0, 1fr); }
   .quad-layout { grid-template-columns: 1fr; }
   .quad-map-panel .quad-map { max-width: 420px; margin: 0 auto; }
+  .labor-grid { grid-template-columns: 1fr; }
+  .labor-block { border-right: 0; border-bottom: 1px solid var(--line-soft); }
 }
 
 @media (max-width: 780px) {

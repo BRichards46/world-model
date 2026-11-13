@@ -58,7 +58,7 @@ const READING_LANGUAGE = {
   mortgage_rate: { label: "Current mortgage rate", note: "4-week average" },
 };
 
-const state = { rows: [], history: new Map(), riskOverlay: null, quad: null, quadAssets: null, releases: null, directionalMomentum: null, premiumSelling: null, component: "all", search: "", attentionOnly: false, view: "monitor", historyRange: "3y" };
+const state = { rows: [], history: new Map(), riskOverlay: null, quad: null, quadAssets: null, laborQuad: null, releases: null, directionalMomentum: null, premiumSelling: null, component: "all", search: "", attentionOnly: false, view: "monitor", historyRange: "3y" };
 
 document.addEventListener("DOMContentLoaded", init);
 
@@ -76,9 +76,10 @@ async function init() {
       const response = await fetch(path, { cache: "no-store" }).catch(() => null);
       return response?.ok ? response.json() : null;
     };
-    [state.quad, state.quadAssets, state.releases, state.outlook, state.riskContext] = await Promise.all([
+    [state.quad, state.quadAssets, state.laborQuad, state.releases, state.outlook, state.riskContext] = await Promise.all([
       optional("./data/growth_inflation_quad.json"),
       optional("./data/quad_asset_performance.json"),
+      optional("./data/labor_quad.json"),
       optional("./data/release_forecasts.json"),
       optional("./data/outlook.json"),
       optional("./data/risk_context.json"),
@@ -236,6 +237,7 @@ function renderQuadStrip() {
       <div class="eyebrow">GROWTH × INFLATION QUAD</div>
       <div class="quad-state-line">${quadBadge(current?.quad, "large")}<h2>${current ? `${escapeHtml(current.quarter)} ${escapeHtml(current.status === "partial" ? "partly reported" : "projected")}` : "No projection"}</h2></div>
       <p>${current ? `${escapeHtml(QUAD_META[current.quad]?.short || "")} · ${escapeHtml(quadAgreement(current) || "base case")}.` : ""} Last realized: ${lastRealized ? `${escapeHtml(lastRealized.quarter)} ${escapeHtml(quadName(lastRealized.quad))}` : "n/a"}.</p>
+      ${laborQuadLineMarkup(state.laborQuad)}
       <button class="quad-link" type="button" data-open-quads>Open base-effect outlook →</button>
     </div>
     <div class="quad-path">${cells.map(quadCellMarkup).join("")}</div>`;
@@ -271,7 +273,8 @@ function renderQuads() {
   const interpolated = (payload.interpolated_cpi_months || []).join(", ");
   const method = payload.method || {};
   container.innerHTML = `<div class="quad-intro"><div><span class="eyebrow">RATE OF CHANGE, NOT LEVEL</span><h3>Where the year-over-year rates are heading</h3></div>
-      <p>Growth is real GDP YoY; inflation is the quarterly average of headline CPI YoY. A quarter's quad depends on whether each rate accelerates or decelerates versus the prior quarter, and that depends heavily on the comparison period a year earlier.</p></div>
+      <p>Growth is real GDP YoY, or payroll YoY in the payroll quad; inflation is the quarterly average of headline CPI YoY. A quarter's quad depends on whether each rate accelerates or decelerates versus the prior quarter, and that depends heavily on the comparison period a year earlier.</p></div>
+    ${laborQuadMarkup(state.laborQuad)}
     <div class="quad-layout">
       <section class="quad-panel quad-map-panel"><header><span>Quad path</span><em>Δ growth YoY × Δ inflation YoY, pp per quarter</em></header>${quadMapMarkup(rows)}</section>
       <section class="quad-panel"><header><span>What each quarter has to clear</span><em>Base case vs hurdle</em></header>
@@ -425,6 +428,49 @@ function quadTradeabilityMarkup(payload) {
   const span = range.length ? `${quadSigned(Math.min(...range))} to ${quadSigned(Math.max(...range))}%/yr` : "n/a";
   return `<section class="quad-panel quad-verdict ${anyEdge ? "edge" : "none"}"><header><span>Is the quad tradeable?</span><em>Risk-balanced quad playbook, 3-month hold, ${escapeHtml(payload.sample_start)} → ${escapeHtml(payload.sample_end)}</em></header>
     <p><strong>${anyEdge ? "A tradeable quad signal shows an edge." : "No tradeable quad signal has an edge."}</strong> Following the textbook playbook with the projected or last-realized quad earned ${escapeHtml(span)}, none significant.${hindsight ? ` With hindsight quads it earned ${quadSigned(hindsight.annualized_return)}%/yr (q ${quadNum(hindsight.q_value, 2)}): the quad matters, but markets move before the data confirms it.` : ""} Treat the quad as context for HedgeEye-style commentary, not a position.</p>
+  </section>`;
+}
+
+function laborQuadRows(payload) { return Array.isArray(payload?.quarters) ? payload.quarters : []; }
+function laborQuadCurrent(payload) {
+  const ahead = laborQuadRows(payload).filter((row) => row.status !== "realized");
+  return ahead.find((row) => row.is_current_quarter) || ahead[0];
+}
+
+function laborQuadLineMarkup(payload) {
+  const current = laborQuadCurrent(payload);
+  if (!current) return "";
+  return `<p class="quad-alt"><span>Payroll quad</span>${quadBadge(current.quad)}<em>${escapeHtml(quadAgreement(current) || "base case")}</em></p>`;
+}
+
+function laborQuadMarkup(payload) {
+  const rows = laborQuadRows(payload);
+  if (!rows.length) return "";
+  const realized = rows.filter((row) => row.status === "realized");
+  const ahead = rows.filter((row) => row.status !== "realized");
+  const current = laborQuadCurrent(payload);
+  const horizons = payload.backtest?.horizons || [];
+  const now = horizons.find((row) => row.horizon === 0);
+  const pct = (value) => (value == null ? "n/a" : `${Math.round(value * 100)}%`);
+  const evidence = payload.assets?.evidence_by_quad || {};
+  const evidenceRows = (quad) => (evidence[quad] || []).slice(0, 8).map((row) => `<div class="labor-row"><span>${escapeHtml(row.asset_label)}</span><span class="${row.annualized_spread > 0 ? "up" : "down"}">${quadSigned(row.annualized_spread)}%/yr</span><span>${escapeHtml(row.evidence)}</span></div>`).join("");
+  const currentQuad = current?.quad;
+  const assetBlock = (evidence[currentQuad] || []).length
+    ? `<p>After a projected ${escapeHtml(quadName(currentQuad))} quarter, versus all months (3-month returns, annualized):</p>${evidenceRows(currentQuad)}`
+    : `<p>No robust asset pattern after a projected ${escapeHtml(quadName(currentQuad))} quarter.${(evidence["3"] || []).length && currentQuad !== 3 ? " The one that holds is Stagflation (Quad 3):" : ""}</p>${currentQuad !== 3 ? evidenceRows("3") : ""}`;
+  const fedPaths = payload.fed?.paths || [];
+  const fedRows = [1, 2, 3, 4].map((quad) => `<div class="labor-row ${quad === currentQuad ? "current" : ""}"><span>${quadBadge(quad)}</span>${fedPaths.map((path) => { const value = path.by_quad?.[quad]?.mean_change; return `<span>${value == null ? "n/a" : `${signed(value, 2)} pp`}</span>`; }).join("")}</div>`).join("");
+  const fedHead = `<div class="labor-row head"><span>Projected quad</span>${fedPaths.map((path) => `<span>Next ${escapeHtml(path.months)} mo</span>`).join("")}</div>`;
+  const fedNote = fedPaths.map((path) => `${path.months} mo p ${quadNum(path.p_value, 2)}`).join(" · ");
+  const accuracy = horizons.map((row) => `<div class="labor-row"><span>${escapeHtml(row.label)}</span><span class="emph">${pct(row.quad_hit_rate)}</span><span>${pct(row.gdp_quad_hit_rate)}</span><span>${pct(row.growth_direction_hit_rate)}</span><span>${pct(row.gdp_growth_direction_hit_rate)}</span></div>`).join("");
+  return `<section class="quad-panel labor-quad"><header><span>Payroll quad</span><em>Growth from payrolls · current quarter right ${pct(now?.quad_hit_rate)} of the time vs ${pct(now?.gdp_quad_hit_rate)} for the GDP quad</em></header>
+    <div class="quad-path">${[...realized.slice(-3), ...ahead].map(quadCellMarkup).join("")}</div>
+    <div class="labor-grid">
+      <div class="labor-block"><h4>Assets</h4>${assetBlock}</div>
+      <div class="labor-block"><h4>Fed funds afterwards</h4>${fedHead}${fedRows}<small>Average change after month-ends with each projected quad, ${escapeHtml(payload.backtest?.start || "")} on (${escapeHtml(fedNote)}). Not an edge on rates: the 2-year yield already prices it.</small></div>
+      <div class="labor-block"><h4>Walk-forward accuracy</h4><div class="labor-row head five"><span>Horizon</span><span>Quad</span><span>GDP quad</span><span>Growth dir.</span><span>GDP</span></div>${accuracy.replaceAll('class="labor-row"', 'class="labor-row five"')}<small>${escapeHtml(payload.backtest?.note || "")}</small></div>
+    </div>
+    <p class="quad-note">${escapeHtml(payload.method?.growth || "")} ${escapeHtml(payload.method?.inflation || "")} ${escapeHtml(payload.method?.why || "")} Payrolls through ${escapeHtml(payload.last_payroll_month || "n/a")}.</p>
   </section>`;
 }
 
