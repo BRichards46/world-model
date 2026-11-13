@@ -1,0 +1,120 @@
+version: 1
+
+# Expanding, release-aware ridge regressions. Every feature is reconstructed
+# using only vintages published before the target release date.
+model:
+  ridge_penalty: 4.0
+  minimum_train_observations: 60
+  minimum_oos_observations: 36
+  minimum_feature_coverage: 0.80
+
+targets:
+  payroll_change:
+    label: Nonfarm payroll change
+    series_id: PAYEMS
+    target_transform: monthly_pct
+    target_scale: 10000.0
+    unit: basis points of payroll employment
+    display_as_level_change: true
+    display_unit: thousand jobs
+    direction_reference: zero
+    max_model_mae: 10.0
+    min_release_lag_days: 20
+    max_release_lag_days: 70
+    variants:
+      core:
+        ridge_penalty: 20.0
+        features:
+          - {id: prior_payroll_growth, series_id: PAYEMS, transform: monthly_pct, scale: 10000.0}
+          - {id: payroll_3m_average, series_id: PAYEMS, transform: monthly_pct_mean, window: 3, scale: 10000.0}
+          - {id: payroll_6m_average, series_id: PAYEMS, transform: monthly_pct_mean, window: 6, scale: 10000.0}
+          - {id: payroll_yoy_growth, series_id: PAYEMS, transform: monthly_pct, lag: 12, scale: 100.0}
+          - {id: initial_claims_4w, series_id: ICSA, transform: rolling_mean, window: 4, scale: 0.001}
+          - {id: initial_claims_4w_change, series_id: ICSA, transform: rolling_mean_change, window: 4, lag: 4, scale: 0.001}
+          - {id: continuing_claims_4w, series_id: CCSA, transform: rolling_mean, window: 4, scale: 0.001}
+          - {id: continuing_claims_4w_change, series_id: CCSA, transform: rolling_mean_change, window: 4, lag: 4, scale: 0.001}
+          - {id: jolts_hires_rate, series_id: JTSHIR, transform: latest}
+          - {id: jolts_layoff_rate, series_id: JTSLDR, transform: latest}
+          - {id: jolts_openings_rate, series_id: JTSJOR, transform: latest}
+          - {id: jolts_quits_rate, series_id: JTSQUR, transform: latest}
+          - {id: temp_help_growth, series_id: TEMPHELPS, transform: monthly_pct, scale: 100.0}
+      adp:
+        ridge_penalty: 10.0
+        minimum_train_observations: 24
+        minimum_oos_observations: 36
+        minimum_feature_coverage: 1.0
+        features:
+          - {id: prior_payroll_growth, series_id: PAYEMS, transform: monthly_pct, scale: 10000.0}
+          - {id: adp_private_payroll_change, series_id: ADPMNUSNERSA, transform: monthly_diff, scale: 0.001}
+          - {id: initial_claims_4w, series_id: ICSA, transform: rolling_mean, window: 4, scale: 0.001}
+          - {id: continuing_claims_4w, series_id: CCSA, transform: rolling_mean, window: 4, scale: 0.001}
+          - {id: jolts_hires_rate, series_id: JTSHIR, transform: latest}
+          - {id: jolts_layoff_rate, series_id: JTSLDR, transform: latest}
+
+  headline_cpi_mom:
+    label: Headline CPI MoM
+    series_id: CPIAUCSL
+    target_transform: monthly_pct
+    target_scale: 100.0
+    unit: percent
+    max_model_mae: 0.10
+    min_release_lag_days: 20
+    max_release_lag_days: 70
+    variants:
+      pipeline:
+        features:
+          - {id: prior_headline_cpi_mom, series_id: CPIAUCSL, transform: monthly_pct, scale: 100.0}
+          - {id: core_final_demand_ppi_mom, series_id: WPSFD49116, transform: monthly_pct, scale: 100.0}
+          - {id: core_goods_ppi_mom, series_id: WPSFD413, transform: monthly_pct, scale: 100.0}
+          - {id: import_prices_mom, series_id: IR, transform: monthly_pct, scale: 100.0}
+          - {id: rent_mom, series_id: CUSR0000SEHA, transform: monthly_pct, scale: 100.0}
+          - {id: oer_mom, series_id: CUSR0000SEHC, transform: monthly_pct, scale: 100.0}
+          - {id: used_vehicles_mom, series_id: CUSR0000SETA02, transform: monthly_pct, scale: 100.0}
+          - {id: gasoline_monthly_change, series_id: GASREGW, transform: monthly_mean_pct, scale: 100.0}
+          - {id: oil_monthly_change, series_id: DCOILWTICO, transform: monthly_mean_pct, scale: 100.0}
+          - {id: five_year_breakeven_change, series_id: T5YIE, transform: rolling_mean_change, window: 20, lag: 20}
+
+  core_cpi_mom:
+    label: Core CPI MoM
+    series_id: CPILFESL
+    target_transform: monthly_pct
+    target_scale: 100.0
+    unit: percent
+    max_model_mae: 0.10
+    min_release_lag_days: 20
+    max_release_lag_days: 70
+    variants:
+      pipeline:
+        features:
+          - {id: prior_core_cpi_mom, series_id: CPILFESL, transform: monthly_pct, scale: 100.0}
+          - {id: core_final_demand_ppi_mom, series_id: WPSFD49116, transform: monthly_pct, scale: 100.0}
+          - {id: core_goods_ppi_mom, series_id: WPSFD413, transform: monthly_pct, scale: 100.0}
+          - {id: import_prices_mom, series_id: IR, transform: monthly_pct, scale: 100.0}
+          - {id: private_wages_mom, series_id: CES0500000003, transform: monthly_pct, scale: 100.0}
+          - {id: employment_cost_qoq, series_id: ECIWAG, transform: latest_pct, lag: 1, scale: 100.0}
+          - {id: rent_mom, series_id: CUSR0000SEHA, transform: monthly_pct, scale: 100.0}
+          - {id: oer_mom, series_id: CUSR0000SEHC, transform: monthly_pct, scale: 100.0}
+          - {id: used_vehicles_mom, series_id: CUSR0000SETA02, transform: monthly_pct, scale: 100.0}
+          - {id: broad_dollar_change, series_id: DTWEXBGS, transform: rolling_pct, lag: 20, scale: 100.0}
+
+  core_pce_mom:
+    label: Core PCE MoM
+    series_id: PCEPILFE
+    target_transform: monthly_pct
+    target_scale: 100.0
+    unit: percent
+    max_model_mae: 0.10
+    min_release_lag_days: 35
+    max_release_lag_days: 85
+    variants:
+      pipeline:
+        features:
+          - {id: prior_core_pce_mom, series_id: PCEPILFE, transform: monthly_pct, scale: 100.0}
+          - {id: latest_core_cpi_mom, series_id: CPILFESL, transform: monthly_pct, scale: 100.0}
+          - {id: core_final_demand_ppi_mom, series_id: WPSFD49116, transform: monthly_pct, scale: 100.0}
+          - {id: core_goods_ppi_mom, series_id: WPSFD413, transform: monthly_pct, scale: 100.0}
+          - {id: import_prices_mom, series_id: IR, transform: monthly_pct, scale: 100.0}
+          - {id: private_wages_mom, series_id: CES0500000003, transform: monthly_pct, scale: 100.0}
+          - {id: employment_cost_qoq, series_id: ECIWAG, transform: latest_pct, lag: 1, scale: 100.0}
+          - {id: rent_mom, series_id: CUSR0000SEHA, transform: monthly_pct, scale: 100.0}
+          - {id: oer_mom, series_id: CUSR0000SEHC, transform: monthly_pct, scale: 100.0}

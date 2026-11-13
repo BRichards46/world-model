@@ -1,0 +1,46 @@
+availability_lag_trading_days: 1
+low_percentile: 40
+high_percentile: 60
+minimum_components: 2
+minimum_episode_days: 5
+bootstrap_repetitions: 2000
+false_discovery_rate: 0.10
+meaningful_volatility_ratio_low: 0.85
+meaningful_volatility_ratio_high: 1.15
+
+dimensions:
+  growth:
+    indicators:
+      payroll_growth: 1
+      unemployment_rate: -1
+      real_consumer_spending: 1
+      industrial_production: 1
+      real_gdp_growth: 1
+
+  inflation:
+    indicators:
+      core_pce_inflation: 1
+      core_cpi_inflation: 1
+      median_cpi: 1
+
+  financial_conditions:
+    indicators:
+      real_policy_rate: 1
+      high_yield_spread: 1
+      adjusted_financial_conditions: 1
+
+# The futures histories are back-adjusted continuous contracts. Percentage
+# returns can explode when an adjusted price passes near zero, so the primary
+# cross-asset lens uses daily price change divided by the trailing one-year
+# median absolute price. Results are directional performance scores, not cash
+# returns. Exact percentage-return reporting is reserved for clean spot/total-
+# return histories in a later asset-specific layer.
+return_method: normalized_price_change
+
+equity_benchmark:
+  enabled: true
+  id: sp500_total_return
+  label: S&P 500 total return
+  # Norgate index symbols: $SPX price history chained to $SPXTR total return.
+  price_symbol: $SPX
+  total_return_symbol: $SPXTR

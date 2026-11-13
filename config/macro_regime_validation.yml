@@ -1,0 +1,69 @@
+evaluation_frequency: ME
+min_train_observations: 60
+minimum_oos_observations: 60
+fdr_alpha: 0.10
+market_baseline_column: composite_score
+asset_group: equity
+
+horizons:
+  one_month: 21
+  three_months: 63
+  six_months: 126
+  twelve_months: 252
+
+targets:
+  - forward_return
+  - future_volatility
+  - max_drawdown
+
+# These are deliberately specified economic hypotheses, not an exhaustive
+# pairwise search. A positive interaction score requires both production
+# weakness and inflation pressure to be present at the same time.
+combinations:
+  - id: indpro_slowing_core_pce_high
+    label: Slowing production × elevated core PCE
+    growth_indicator: industrial_production
+    growth_metric: velocity_value
+    inflation_indicator: core_pce_inflation
+    inflation_metric: level_percentile_10y
+    inflation_condition: elevated
+
+  - id: indpro_slowing_core_pce_rising
+    label: Slowing production × rising core PCE
+    growth_indicator: industrial_production
+    growth_metric: velocity_value
+    inflation_indicator: core_pce_inflation
+    inflation_metric: velocity_value
+    inflation_condition: rising
+
+  - id: indpro_slowing_core_cpi_high
+    label: Slowing production × elevated core CPI
+    growth_indicator: industrial_production
+    growth_metric: velocity_value
+    inflation_indicator: core_cpi_inflation
+    inflation_metric: level_percentile_10y
+    inflation_condition: elevated
+
+  - id: indpro_slowing_core_cpi_rising
+    label: Slowing production × rising core CPI
+    growth_indicator: industrial_production
+    growth_metric: velocity_value
+    inflation_indicator: core_cpi_inflation
+    inflation_metric: velocity_value
+    inflation_condition: rising
+
+  - id: indpro_slowing_median_cpi_high
+    label: Slowing production × elevated median CPI
+    growth_indicator: industrial_production
+    growth_metric: velocity_value
+    inflation_indicator: median_cpi
+    inflation_metric: level_percentile_10y
+    inflation_condition: elevated
+
+  - id: indpro_slowing_median_cpi_rising
+    label: Slowing production × rising median CPI
+    growth_indicator: industrial_production
+    growth_metric: velocity_value
+    inflation_indicator: median_cpi
+    inflation_metric: velocity_value
+    inflation_condition: rising

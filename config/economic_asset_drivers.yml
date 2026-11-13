@@ -19,7 +19,7 @@ features:
 
 asset_groups:
   equity:
-    label: Equity index futures
+    label: U.S. equity index futures (ES + NQ)
     driver_groups:
       - sales_production
       - employment
@@ -28,8 +28,6 @@ asset_groups:
     assets:
       ES: ES__B.parquet
       NQ: NQ__B.parquet
-      YM: YM__B.parquet
-      NK: NK__B.parquet
 
   rates_duration:
     label: Treasury duration futures

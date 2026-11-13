@@ -1,0 +1,67 @@
+as_of_lag_days: 0
+
+# Weights favor 6-12 months: the trend study (docs/trend_range_study.md) found 12-month trend
+# strongest and 3-month weakest; 1 and 3 months stay visible as context.
+horizons:
+  - id: one_month
+    label: 1m
+    days: 21
+    weight: 0.05
+  - id: three_months
+    label: 3m
+    days: 63
+    weight: 0.15
+  - id: six_months
+    label: 6m
+    days: 126
+    weight: 0.25
+  - id: ten_months
+    label: 10m
+    days: 210
+    weight: 0.25
+  - id: twelve_months
+    label: 12m
+    days: 252
+    weight: 0.30
+
+classification:
+  positive_threshold: 0.25
+  strong_threshold: 1.00
+  minimum_components: 3
+  strong_alignment: 4
+  directional_alignment: 3
+
+freshness:
+  due_after_days: 3
+  stale_after_days: 7
+
+futures:
+  - {id: ES, label: S&P 500, group: equity_indexes, group_label: Equity indexes, order: 1, file: ES__B.parquet}
+  - {id: NQ, label: Nasdaq 100, group: equity_indexes, group_label: Equity indexes, order: 2, file: NQ__B.parquet}
+  - {id: RTY, label: Russell 2000, group: equity_indexes, group_label: Equity indexes, order: 3, file: ER2_B.parquet}
+  - {id: ZB, label: Treasury bond, group: treasuries, group_label: Treasuries, order: 4, file: ZB__B.parquet}
+  - {id: ZN, label: 10-year Treasury note, group: treasuries, group_label: Treasuries, order: 5, file: ZN__B.parquet}
+  - {id: DX, label: U.S. Dollar Index, group: dollar, group_label: Dollar, order: 6, file: DX2_B.parquet}
+  - {id: GC, label: Gold, group: metals, group_label: Metals, order: 7, file: GC2_B.parquet}
+  - {id: SI, label: Silver, group: metals, group_label: Metals, order: 8, file: SI2_B.parquet}
+  - {id: CL, label: Crude oil, group: energy, group_label: Energy, order: 9, file: CL2_B.parquet}
+  - {id: BO, label: Soybean oil, group: agriculture, group_label: Agriculture, order: 10, file: BO2_B.parquet}
+  - {id: FC, label: Feeder cattle, group: agriculture, group_label: Agriculture, order: 11, file: FC__B.parquet}
+  - {id: SB, label: Sugar, group: agriculture, group_label: Agriculture, order: 12, file: SB2_B.parquet}
+  - {id: KC, label: Coffee, group: agriculture, group_label: Agriculture, order: 13, file: KC2_B.parquet}
+  - {id: KW, label: Kansas City wheat, group: agriculture, group_label: Agriculture, order: 14, file: KW2_B.parquet}
+
+equities:
+  benchmark: {id: SPY, label: S&P 500 ETF}
+  assets:
+    - {id: XLC, label: Communication Services, order: 1}
+    - {id: XLY, label: Consumer Discretionary, order: 2}
+    - {id: XLP, label: Consumer Staples, order: 3}
+    - {id: XLE, label: Energy, order: 4}
+    - {id: XLF, label: Financials, order: 5}
+    - {id: XLV, label: Health Care, order: 6}
+    - {id: XLI, label: Industrials, order: 7}
+    - {id: XLB, label: Materials, order: 8}
+    - {id: XLRE, label: Real Estate, order: 9}
+    - {id: XLK, label: Technology, order: 10}
+    - {id: XLU, label: Utilities, order: 11}

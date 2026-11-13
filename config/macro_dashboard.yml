@@ -1,0 +1,303 @@
+version: 1
+
+build:
+  bootstrap_history_years: 5
+  incremental_overlap_days: 14
+
+history:
+  primary_window_years: 10
+  structural_window: expanding
+  minimum_history_years: 5
+  baseline_sensitive_threshold_pct_points: 25
+  flat_velocity_percentile: 20
+  minimum_observations:
+    daily: 1250
+    weekly: 260
+    monthly: 60
+    quarterly: 20
+
+freshness:
+  # These thresholds measure time since the release that introduced the latest
+  # observation, so a later revision does not make an old observation look new.
+  stale_after_days:
+    daily: 4
+    weekly: 14
+    monthly: 50
+    quarterly: 130
+    mixed_daily_monthly: 50
+
+# Complete dependency set consumed from the existing point-in-time FRED
+# datafeed. The dashboard does not maintain a separate downloader or
+# per-series data route.
+required_fred_series_ids:
+  - PAYEMS
+  - UNRATE
+  - PCEC96
+  - INDPRO
+  - GDPC1
+  - PCEPILFE
+  - CPILFESL
+  - MEDCPIM158SFRBCLE
+  - EXPINF5YR
+  - DFF
+  - T10Y3M
+  - DGS10
+  - DGS3MO
+  - BAMLH0A0HYM2
+  - BAMLC0A0CM
+  - BAMLC0A4CBBB
+  - BAMLH0A3HYC
+  - BAA10Y
+  - ANFCI
+  - PERMIT
+  - MORTGAGE30US
+  - HOUST
+  - CLF16OV
+
+# Additions made to the upstream datafeed catalog for this dashboard. They are
+# consumed through the same standard point-in-time pipeline as every other row.
+datafeed_additions:
+  - PCEC96
+  - ANFCI
+  - MORTGAGE30US
+  - BAMLC0A0CM
+  - BAMLC0A4CBBB
+  - BAMLH0A3HYC
+  - BAA10Y
+
+# Familiar raw readings and Calculon-compatible context shown only inside row
+# drill-downs. These values are not independently scored in the core monitor.
+drilldown_fred_series_ids:
+  - DGS10
+  - DGS3MO
+  - RSAFS
+  - RPI
+  - CPIAUCSL
+  - CPIENGSL
+  - CPIUFDSL
+  - GDP
+  - GDPNOW
+  - PCE
+  - PCENOW
+  - AWHMAN
+  - DGORDER
+  - IPMAN
+  - IPFINAL
+  - IPBUSEQ
+  - IPMAT
+  - BAMLC0A0CM
+  - BAMLC0A4CBBB
+  - BAMLH0A3HYC
+  - BAA10Y
+
+# GTT-style equity risk overlay. This is a separate, threshold-based decision
+# layer; it does not alter the level/velocity percentiles or core row scores.
+equity_risk_overlay:
+  enabled: true
+  # Norgate index symbols: $SPX price history chained to $SPXTR total return.
+  price_symbol: $SPX
+  total_return_symbol: $SPXTR
+  moving_average_months: 10
+  max_market_lag_days: 5
+  # Unemployment warns only when it is more than this many points above its 12-month average.
+  # 0.1 was the strongest GTT setting with industrial production (docs/gtt_threshold_validation.md).
+  unemployment_buffer_pp: 0.1
+  # Historical odds of each trigger being crossed by the next release use data from this date.
+  trigger_odds_start: "1990-01-01"
+
+# Descriptive risk context for the overlay state (src/world_model/states/equity_risk_context.py).
+# Tiers come from how often a worst-decile 3-month drawdown followed each state since `start`.
+equity_risk_context:
+  enabled: true
+  start: "1972-09-01"
+  horizon_days: 63
+  worst_share: 0.10
+  # Your legacy trigger levels; the invested state is split by whether at least `legacy_at_least` warn.
+  legacy_triggers:
+    indpro_yoy: ["<=", 1.0]
+    payems_yoy: ["<=", 1.0]
+    unemployment_gap: [">", 0.1]
+    housing_lf_yoy: ["<=", -10.0]
+    cpi_yoy: [">=", 2.5]
+  legacy_at_least: 2
+  # Slowing production with elevated core inflation (docs/macro_regime_validation.md).
+  regime_summary: outputs/macro_regime_validation/macro_regime_summary.csv
+  elevated_percentile: 60
+
+# Read-only summaries of the standalone point-in-time market-relevance screen.
+# These findings appear in drill-downs and do not affect dashboard scores.
+market_relevance:
+  enabled: true
+  summary_path: outputs/macro_market_validation/macro_market_summary.csv
+  max_relationships_per_indicator: 4
+
+# The Assets tab was removed (most relationships were volatility associations mined
+# across many tests); the build writes an empty asset_indications.json.
+asset_indications:
+  enabled: false
+  summary_path: outputs/macro_market_validation/macro_market_summary.csv
+  regime_summary_path: outputs/macro_regime_validation/macro_regime_summary.csv
+  # Current readings inside 40th-60th percentile are treated as neutral.
+  deadband_percentile_points: 10
+
+rows:
+  - id: payroll_growth
+    order: 1
+    label: Payroll growth
+    component: activity_labor
+    series_ids: [PAYEMS]
+    source_mode: vintage
+    frequency: monthly
+    polarity: higher_strength
+    recipe: three_month_growth
+
+  - id: unemployment_rate
+    order: 2
+    label: Unemployment rate
+    component: activity_labor
+    series_ids: [UNRATE]
+    source_mode: vintage
+    frequency: monthly
+    polarity: higher_slack
+    recipe: three_month_average_change
+
+  - id: real_consumer_spending
+    order: 3
+    label: Real consumer spending
+    component: activity_labor
+    series_ids: [PCEC96]
+    fallback_series_ids: [RRSFS]
+    source_mode: vintage
+    frequency: monthly
+    polarity: higher_strength
+    recipe: three_month_growth
+
+  - id: industrial_production
+    order: 4
+    label: Industrial production
+    component: activity_labor
+    series_ids: [INDPRO]
+    source_mode: vintage
+    frequency: monthly
+    polarity: higher_strength
+    recipe: three_month_growth
+
+  - id: real_gdp_growth
+    order: 5
+    label: Real GDP growth
+    component: activity_labor
+    series_ids: [GDPC1]
+    source_mode: vintage
+    frequency: quarterly
+    polarity: higher_strength
+    recipe: quarterly_growth
+
+  - id: core_pce_inflation
+    order: 6
+    label: Core PCE inflation
+    component: inflation
+    series_ids: [PCEPILFE]
+    source_mode: vintage
+    frequency: monthly
+    polarity: higher_heat
+    recipe: inflation_yoy_mom_change
+
+  - id: core_cpi_inflation
+    order: 7
+    label: Core CPI inflation
+    component: inflation
+    series_ids: [CPILFESL]
+    source_mode: vintage
+    frequency: monthly
+    polarity: higher_heat
+    recipe: inflation_yoy_mom_change
+
+  - id: median_cpi
+    order: 8
+    label: Median CPI
+    component: inflation
+    series_ids: [MEDCPIM158SFRBCLE]
+    source_mode: vintage
+    frequency: monthly
+    polarity: higher_heat
+    recipe: latest_value_change
+
+  - id: five_year_inflation_expectations
+    order: 9
+    label: Five-year inflation expectations
+    component: inflation
+    series_ids: [EXPINF5YR]
+    source_mode: vintage
+    frequency: monthly
+    polarity: higher_heat
+    recipe: three_month_average_change
+
+  - id: real_policy_rate
+    order: 10
+    label: Real policy rate
+    component: policy_financial_conditions
+    series_ids: [DFF, PCEPILFE]
+    source_mode: vintage
+    frequency: mixed_daily_monthly
+    polarity: higher_tightness
+    recipe: real_policy_rate
+
+  - id: treasury_curve
+    order: 11
+    label: Treasury curve
+    component: policy_financial_conditions
+    series_ids: [T10Y3M]
+    source_mode: vintage
+    frequency: daily
+    polarity: two_sided
+    recipe: daily_average_change
+
+  - id: high_yield_spread
+    order: 12
+    label: High-yield spread
+    component: policy_financial_conditions
+    series_ids: [BAMLH0A0HYM2]
+    source_mode: vintage
+    frequency: daily
+    polarity: higher_stress
+    recipe: daily_average_change
+    source_warning: Verify that the datafeed provides enough point-in-time history for a 10-year percentile; the current local file begins in 2023.
+
+  - id: adjusted_financial_conditions
+    order: 13
+    label: Adjusted financial conditions
+    component: policy_financial_conditions
+    series_ids: [ANFCI]
+    source_mode: vintage
+    frequency: weekly
+    polarity: higher_tightness
+    recipe: weekly_average_change
+
+  - id: building_permits
+    order: 14
+    label: Building permits
+    component: housing
+    series_ids: [PERMIT]
+    source_mode: vintage
+    frequency: monthly
+    polarity: higher_strength
+    recipe: permits_yoy_growth
+    context:
+      - id: housing_starts_intensity
+        label: Housing starts intensity
+        series_ids: [HOUST, CLF16OV]
+        source_mode: vintage
+        frequency: monthly
+        polarity: higher_strength
+        recipe: housing_starts_intensity
+      - id: mortgage_rate
+        label: 30-year mortgage rate
+        series_ids: [MORTGAGE30US]
+        source_mode: vintage
+        frequency: weekly
+        polarity: higher_tightness
+        recipe: weekly_average_change_bps
+
+deferred:
+  - id: ism_manufacturing_services
+    reason: No authorized free API or licensed local source is configured.

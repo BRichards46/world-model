@@ -1,0 +1,18 @@
+evaluation_frequency: W-FRI
+component_signal_threshold: 0.25
+minimum_sample_size: 40
+
+forward_horizons:
+  - {id: one_week, label: 1w, days: 5}
+  - {id: one_month, label: 1m, days: 21}
+  - {id: three_months, label: 3m, days: 63}
+  - {id: six_months, label: 6m, days: 126}
+
+periods:
+  - {id: full, label: Full history, start: null}
+  - {id: post_2015, label: 2015 onward, start: 2015-01-01}
+
+robustness:
+  require_mfe_uplift: true
+  require_mae_reduction: true
+  require_edge_uplift: true

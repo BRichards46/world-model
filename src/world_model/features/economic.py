@@ -42,24 +42,139 @@ def build_realtime_indicator_from_vintage(
 
 def score_indicator(
     value: pd.Series,
-    window: int = 120,
+    window: int | None = 120,
+    window_years: int | None = None,
     min_periods: int = 36,
+    min_history_years: int | None = None,
     scale: float = 2.0,
     invert: bool = False,
 ) -> pd.Series:
-    z = rolling_z_score(value, window=window, min_periods=min_periods)
+    z = rolling_z_score(
+        value,
+        window=window,
+        window_years=window_years,
+        min_periods=min_periods,
+        min_history_years=min_history_years,
+    )
     score = np.tanh(z / scale)
     if invert:
         score = -score
     return pd.Series(score, index=value.index, name=value.name)
 
 
-def rolling_z_score(value: pd.Series, window: int = 120, min_periods: int = 36) -> pd.Series:
+def rolling_z_score(
+    value: pd.Series,
+    window: int | None = 120,
+    window_years: int | None = None,
+    min_periods: int = 36,
+    min_history_years: int | None = None,
+) -> pd.Series:
     clean = value.astype(float)
+    if window_years is not None:
+        return _calendar_rolling_z_score(
+            clean,
+            window_years=window_years,
+            min_periods=min_periods,
+            min_history_years=min_history_years,
+        )
+    if window is None:
+        raise ValueError("window is required when window_years is not set")
     baseline = clean.rolling(window=window, min_periods=min_periods)
     mean = baseline.mean().shift(1)
     std = baseline.std(ddof=0).shift(1)
     return (clean - mean) / std.replace(0.0, np.nan)
+
+
+def historical_percentile_rank(
+    value: pd.Series,
+    window_years: int | None = 10,
+    min_periods: int = 20,
+    min_history_years: int | None = 5,
+) -> pd.Series:
+    """Rank each value against prior native-frequency observations only.
+
+    A finite ``window_years`` produces a trailing calendar-window percentile.
+    ``None`` produces an expanding-history percentile. The current observation
+    is always excluded from its own comparison set.
+    """
+    clean = _validated_datetime_series(value)
+    result = pd.Series(np.nan, index=clean.index, dtype=float, name=value.name)
+
+    for position, (timestamp, current_value) in enumerate(clean.items()):
+        if pd.isna(current_value):
+            continue
+        history = _prior_calendar_history(clean, position, timestamp, window_years)
+        if not _history_is_usable(history, timestamp, min_periods, min_history_years):
+            continue
+        observations = history.to_numpy(dtype=float)
+        less = float(np.count_nonzero(observations < current_value))
+        equal = float(np.count_nonzero(observations == current_value))
+        result.iloc[position] = 100.0 * (less + 0.5 * equal) / len(observations)
+
+    return result
+
+
+def _calendar_rolling_z_score(
+    value: pd.Series,
+    window_years: int,
+    min_periods: int,
+    min_history_years: int | None,
+) -> pd.Series:
+    clean = _validated_datetime_series(value)
+    result = pd.Series(np.nan, index=clean.index, dtype=float, name=value.name)
+
+    for position, (timestamp, current_value) in enumerate(clean.items()):
+        if pd.isna(current_value):
+            continue
+        history = _prior_calendar_history(clean, position, timestamp, window_years)
+        if not _history_is_usable(history, timestamp, min_periods, min_history_years):
+            continue
+        std = float(history.std(ddof=0))
+        if std == 0.0 or pd.isna(std):
+            continue
+        result.iloc[position] = (float(current_value) - float(history.mean())) / std
+
+    return result
+
+
+def _validated_datetime_series(value: pd.Series) -> pd.Series:
+    if not isinstance(value.index, pd.DatetimeIndex):
+        raise TypeError("Calendar-window calculations require a DatetimeIndex")
+    if value.index.has_duplicates:
+        raise ValueError("Calendar-window calculations require a unique index")
+    if not value.index.is_monotonic_increasing:
+        value = value.sort_index()
+    return value.astype(float)
+
+
+def _prior_calendar_history(
+    value: pd.Series,
+    position: int,
+    timestamp: pd.Timestamp,
+    window_years: int | None,
+) -> pd.Series:
+    history = value.iloc[:position]
+    if window_years is not None:
+        if window_years <= 0:
+            raise ValueError("window_years must be positive")
+        history = history.loc[history.index >= timestamp - pd.DateOffset(years=window_years)]
+    return history.dropna()
+
+
+def _history_is_usable(
+    history: pd.Series,
+    timestamp: pd.Timestamp,
+    min_periods: int,
+    min_history_years: int | None,
+) -> bool:
+    if len(history) < min_periods:
+        return False
+    if min_history_years is not None:
+        if min_history_years <= 0:
+            raise ValueError("min_history_years must be positive")
+        if history.index.min() > timestamp - pd.DateOffset(years=min_history_years):
+            return False
+    return True
 
 
 def weighted_average_signed(frame: pd.DataFrame, weights: dict[str, float]) -> pd.Series:

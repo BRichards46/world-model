@@ -1,0 +1,24 @@
+evaluation_frequency: ME
+min_train_observations: 24
+minimum_oos_observations: 60
+fdr_alpha: 0.10
+include_context: true
+market_baseline_column: composite_score
+
+horizons:
+  one_month: 21
+  three_months: 63
+  six_months: 126
+  twelve_months: 252
+
+targets:
+  - forward_return
+  - future_volatility
+  - max_drawdown
+
+features:
+  - level_value
+  - velocity_value
+  - level_percentile_10y
+  - velocity_percentile_10y
+  - level_velocity_interaction

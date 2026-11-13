@@ -4,3 +4,9 @@ csi_cot_processed: ~/data/csi_data/COT_processed
 norgate_prices: ~/data/equity/norgate/prices/adjustment=totalreturn
 norgate_metadata: ~/data/equity/norgate/metadata
 fred: ~/data/fred
+tanuki_options: ~/data/options_analytics/tanuki
+# Release benchmarks (optional: default to siblings of the fred root).
+kalshi: ~/data/kalshi
+cleveland_nowcast: ~/data/cleveland_nowcast
+# BLS store (vintages, seasonal factors, relative importance): required by core_cpi.
+bls: ~/data/bls

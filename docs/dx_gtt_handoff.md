@@ -1,5 +1,11 @@
 # DX Growth-Trend Timing Handoff
 
+> **November 2026 caveat:** this rule was chosen as the best of many filter and trend
+> combinations in the June futures grid, with no significance test. A fixed-rule, point-in-time
+> retest (`docs/gtt_cross_asset_validation.md`) found no robust macro edge for DX. Inflation below
+> 2.5% as a dollar-bearish filter has the same sign as this rule but passes 0/16 GTT risk tests.
+> Treat it as unvalidated.
+
 This is the tested GTT rule for `DX` / U.S. Dollar Index futures.
 
 ## Selected Rule
