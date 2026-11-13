@@ -77,7 +77,7 @@ echo "Describing risk for the current overlay state..."
 echo "Refreshing payroll and inflation release forecasts..."
 "$PYTHON" -m world_model.cli.macro_release_forecast
 echo "Building the bottom-up core CPI nowcast..."
-"$PYTHON" -m world_model.cli.core_cpi
+"$PYTHON" -m world_model.cli.core_cpi || echo "WARNING: bottom-up core CPI failed; the dashboard keeps the previous core model." >&2
 echo "Building the bottom-up energy and headline CPI nowcast..."
 "$PYTHON" -m world_model.cli.energy_cpi
 echo "Scoring release forecasts against Kalshi and the Cleveland Fed nowcast..."
