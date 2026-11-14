@@ -226,3 +226,15 @@ def test_without_the_payroll_quad_the_gdp_quad_leads():
     outlook = build_macro_outlook(_quad(), _overlay(), _releases(), _snapshot())
     assert outlook["ahead"][0]["model"] == "gdp" and "gdp" not in outlook["ahead"][0]
     assert "Next quarter leans Deflation" in outlook["headline"]
+
+
+def test_industrial_production_shows_its_hours_based_forecast():
+    releases = _releases()
+    releases["forecasts"].append(
+        {"target_id": "industrial_production_mom", "variant_id": "hours", "reference_month": "2026-10", "forecast": 0.10,
+         "range_50": [-0.24, 0.40], "range_80": [-0.51, 0.72], "unit": "percent", "validated": True}
+    )
+    outlook = build_macro_outlook(_quad(), _overlay(), releases, _snapshot())
+    production = next(r for r in outlook["releases"] if r["id"] == "industrial_production")
+    assert production["forecasts"][0]["forecast"] == 0.10 and production["forecasts"][0]["validated"]
+    assert any("jobs report" in line for line in production["meaning"])

@@ -51,6 +51,29 @@ targets:
           - {id: jolts_hires_rate, series_id: JTSHIR, transform: latest}
           - {id: jolts_layoff_rate, series_id: JTSLDR, transform: latest}
 
+  industrial_production_mom:
+    label: Industrial production MoM
+    series_id: INDPRO
+    target_transform: monthly_pct
+    target_scale: 100.0
+    unit: percent
+    direction_reference: zero
+    max_model_mae: 0.60
+    min_release_lag_days: 20
+    max_release_lag_days: 70
+    variants:
+      # The jobs report comes out about ten days before industrial production, and the Fed builds much of its
+      # early manufacturing estimate from production-worker hours. Factory orders and oil added nothing in testing.
+      hours:
+        ridge_penalty: 5.0
+        minimum_feature_coverage: 1.0  # aggregate-hours vintages start in 1997
+        features:
+          - {id: prior_ip_mom, series_id: INDPRO, transform: monthly_pct, scale: 100.0}
+          - {id: ip_3m_average, series_id: INDPRO, transform: monthly_pct_mean, window: 3, scale: 100.0}
+          - {id: manufacturing_hours_change, series_id: AWHMAN, transform: monthly_diff}
+          - {id: aggregate_hours_growth, series_id: AWHI, transform: monthly_pct, scale: 100.0}
+          - {id: payroll_growth, series_id: PAYEMS, transform: monthly_pct, scale: 100.0}
+
   headline_cpi_mom:
     label: Headline CPI MoM
     series_id: CPIAUCSL

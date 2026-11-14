@@ -29,7 +29,12 @@ RELEASES: tuple[tuple[str, str, str, tuple[tuple[str, str, str], ...]], ...] = (
     ("cpi", "CPI", "core_cpi_inflation", (("headline_cpi_mom", "pipeline", "Headline"), ("core_cpi_mom", "pipeline", "Core"))),
     ("jobs", "Jobs report", "payroll_growth", (("payroll_change", "core", "Payrolls"),)),
     ("pce", "PCE inflation", "core_pce_inflation", (("core_pce_mom", "pipeline", "Core PCE"),)),
-    ("industrial_production", "Industrial production", "industrial_production", ()),
+    (
+        "industrial_production",
+        "Industrial production",
+        "industrial_production",
+        (("industrial_production_mom", "hours", "Output"),),
+    ),
     ("gdp", "GDP", "real_gdp_growth", ()),
 )
 
@@ -496,6 +501,12 @@ def _meaning(
                 )
             else:
                 lines.append(f"Production is already below a year ago unless it rises {drop:.1f}% this month.")
+        row = forecasts.get(("industrial_production_mom", "hours"))
+        if row and row.get("validated"):
+            lines.append(
+                "Our forecast is built from the jobs report, which comes out about ten days earlier: manufacturing hours, "
+                "aggregate hours and payrolls. It beats a momentum-only model in every test period."
+            )
 
     elif release_id == "gdp":
         if current and current.get("growth_hurdle_saar") is not None:
